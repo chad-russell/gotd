@@ -2,6 +2,7 @@ import { createSignal, type Component } from 'solid-js';
 import { FaSolidPencil } from 'solid-icons/fa'
 import { IoArrowUndo } from 'solid-icons/io'
 import { FiDelete } from 'solid-icons/fi'
+import { List, Map } from 'immutable';
 
 const puzzle = {
   puzzle: "----4--------594-2-5--73-86------127---6--543----27-6--39-8----1--3-4---8----1-54",
@@ -9,16 +10,21 @@ const puzzle = {
   difficulty: "medium"
 };
 
-const [selectedCell, setSelectedCell] = createSignal<number | null>(null);
-
 type CellState = {
-  value: number | null;
-  isGiven: boolean;
-  notes: number[];
+  value: number | null,
+  isGiven: boolean,
+  notes: number[],
 };
 
-function getPuzzleState(puzzle: { puzzle: string }): CellState[][] {
-  const firstState = puzzle.puzzle.split('').map((c) => {
+type GameState = {
+  selectedCell: number | null,
+  cells: CellState[],
+};
+
+type History = GameState[];
+
+function createInitialHistory(puzzle: { puzzle: string }): History {
+  const cells: CellState[] = puzzle.puzzle.split('').map((c) => {
     if (c === '-') {
       return {
         value: null,
@@ -31,63 +37,92 @@ function getPuzzleState(puzzle: { puzzle: string }): CellState[][] {
       value: parseInt(c),
       isGiven: true,
       notes: []
-    }
+    };
   });
 
-  return [firstState];
+  return [{
+    selectedCell: null,
+    cells,
+  }];
 }
 
-const [puzzleState, setPuzzleState] = createSignal(getPuzzleState(puzzle), { equals: false });
+const [history, setHistory] = createSignal(createInitialHistory(puzzle), { equals: false });
 
-function curPuzzleState(): CellState[] {
-  return puzzleState()[puzzleState().length - 1];
+function curGameState(): GameState {
+  let h = history();
+  return h[h.length - 1];
 }
 
-function pushPuzzleState(fn: (ps: CellState[]) => void) {
-  const newPuzzleState = [...curPuzzleState().map((cs) => ({ ...cs }))];
-  fn(newPuzzleState);
-  setPuzzleState([...puzzleState(), newPuzzleState]);
+function pushGameState(fn: (_: GameState) => void) {
+  let copiedGameState: GameState = curGameState();
+  copiedGameState = {
+    selectedCell: copiedGameState.selectedCell,
+    cells: copiedGameState.cells.map(gs => ({ ...gs })),
+  };
+  fn(copiedGameState);
+  setHistory((ps) => [...ps, copiedGameState]);
+}
+
+function updateSelectedCell(fn: (_: CellState) => void) {
+  const sc = curGameState().selectedCell;
+
+  if (sc === null) {
+    return;
+  }
+
+  pushGameState((ps) => {
+    if (!ps.cells[sc].isGiven) {
+      fn(ps.cells[sc]);
+    } else {
+      return ps;
+    }
+  });
 }
 
 function inputNumber(n: number) {
-  const sc = selectedCell();
-
-  if (sc === null) {
-    return;
-  }
-
-  pushPuzzleState((ps) => {
-    if (!ps[sc].isGiven) {
-      ps[sc].value = n;
-    }
-  });
+  updateSelectedCell(sc => sc.value = n);
 }
 
 function clearCell() {
-  const sc = selectedCell();
+  updateSelectedCell(sc => sc.value = null);
+}
 
-  if (sc === null) {
-    return;
-  }
-
-  pushPuzzleState((ps) => {
-    if (!ps[sc].isGiven) {
-      ps[sc].value = null;
-    }
+function setSelectedCell(n: number) {
+  setHistory(h => {
+    h[h.length - 1].selectedCell = n;
+    return h;
   });
 }
 
 function undo() {
-  if (puzzleState().length === 1) {
+  if (history().length === 1) {
     return;
   }
 
-  setPuzzleState(puzzleState().slice(0, puzzleState().length - 1));
+  setHistory(history().slice(0, history().length - 1));
+}
+
+function monkey() {
+  for (let i = 0; i < 1000; i++) {
+    setSelectedCell(Math.floor(Math.random() * 81));
+    inputNumber(Math.floor(Math.random() * 9) + 1);
+
+    setSelectedCell(Math.floor(Math.random() * 81));
+    clearCell();
+  }
+
+  console.log('monkey-ing');
+
+  // for (let i = 0; i < 10000; i++) {
+  //   undo();
+  // }
+
+  console.log('done monkey-ing');
 }
 
 const SudokuCell: Component<{ n: number }> = (props) => {
   let selectedStyle = () => {
-    const isSelected = selectedCell() === props.n;
+    const isSelected = curGameState().selectedCell === props.n;
 
     if (isSelected) {
       return 'bg-blue-200';
@@ -103,7 +138,7 @@ const SudokuCell: Component<{ n: number }> = (props) => {
         setSelectedCell(props.n);
       }}
     >
-      {curPuzzleState()[props.n].value}
+      {curGameState().cells[props.n].value}
     </div >
   );
 }
@@ -185,7 +220,10 @@ const SudokuIcons: Component = () => {
         <FiDelete />
         <span>Clear</span>
       </button>
-      <button style='font-size: min(2.5vh, 5vw)' class='flex flex-col justify-end items-center'>
+      <button
+        style='font-size: min(2.5vh, 5vw)' class='flex flex-col justify-end items-center'
+        onClick={() => monkey()}
+      >
         <FaSolidPencil />
         <span>Number</span>
       </button>
@@ -217,3 +255,4 @@ const App: Component = () => {
 };
 
 export default App;
+
