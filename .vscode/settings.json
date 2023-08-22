@@ -1,0 +1,11 @@
+{
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "server": "localhost",
+            "driver": "PostgreSQL",
+            "name": "do",
+            "connectString": "postgresql://doadmin:AVNS_qgKtUh7sZdZG2fbpl6q@db-postgresql-nyc1-47255-do-user-14375111-0.b.db.ondigitalocean.com:25060/foo?sslmode=require"
+        }
+    ]
+}
