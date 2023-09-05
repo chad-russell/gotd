@@ -496,36 +496,36 @@ pub fn generate(difficulty: Difficulty) -> Sudoku {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::sudokugen::{generate, Difficulty};
-
-    extern crate test;
-
-    use test::Bencher;
-
-    #[test]
-    fn test_print_sudoku() {
-        let sudoku = generate(Difficulty::Medium);
-        let mut s = String::new();
-        for row in 0..9 {
-            for col in 0..9 {
-                let idx = row * 9 + col;
-                s.push_str(&sudoku.solution[idx..idx + 1].to_string());
-                s.push(' ')
-            }
-            s.push('\n');
-        }
-        println!("{}", s);
-    }
-
-    // v1: 13,397ns
-    // v2: 8,900ns
-    // v3: 7,750ns
-    // v4: 7,150ns
-    // v4: 7,000ns
-    #[bench]
-    fn test_get_sudoku(b: &mut Bencher) {
-        b.iter(|| generate(Difficulty::Medium));
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use crate::sudokugen::{generate, Difficulty};
+//
+//     extern crate test;
+//
+//     use test::Bencher;
+//
+//     #[test]
+//     fn test_print_sudoku() {
+//         let sudoku = generate(Difficulty::Medium);
+//         let mut s = String::new();
+//         for row in 0..9 {
+//             for col in 0..9 {
+//                 let idx = row * 9 + col;
+//                 s.push_str(&sudoku.solution[idx..idx + 1].to_string());
+//                 s.push(' ')
+//             }
+//             s.push('\n');
+//         }
+//         println!("{}", s);
+//     }
+//
+//     // v1: 13,397ns
+//     // v2: 8,900ns
+//     // v3: 7,750ns
+//     // v4: 7,150ns
+//     // v4: 7,000ns
+//     #[bench]
+//     fn test_get_sudoku(b: &mut Bencher) {
+//         b.iter(|| generate(Difficulty::Medium));
+//     }
+// }

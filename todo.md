@@ -2,7 +2,6 @@
 
 ## Sudoku 
 ### Frontend
-- Animation for winning
 
 ### Backend
 - Pull new game from backend
