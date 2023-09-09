@@ -1,26 +1,34 @@
-import { createSignal, type Component, Show, onMount, createEffect, Switch, Match, onCleanup } from 'solid-js';
+import { createSignal, type Component, Show, onMount, createEffect } from 'solid-js';
 import { IoArrowUndoOutline } from 'solid-icons/io'
 import { TbNumbers } from 'solid-icons/tb'
 import { FiDelete } from 'solid-icons/fi'
 import { BsPatchQuestionFill, BsPauseCircle, BsPlayCircle } from 'solid-icons/bs'
 import { BsPencil } from 'solid-icons/bs'
+import { dateAtMidnight, daysEqual, getDay } from '../util';
 
 // const puzzle = {
-//   puzzle: "--89---6---6-2--45951----7----7-3----6-8---3---4--6-1---2---39-78-6---526-5-3----",
-//   solution: "428975163376128945951364278819753624267841539534296817142587396783619452695432781",
-//   difficulty: "medium",
+//     puzzle: "--89---6---6-2--45951----7----7-3----6-8---3---4--6-1---2---39-78-6---526-5-3----",
+//     solution: "428975163376128945951364278819753624267841539534296817142587396783619452695432781",
+//     difficulty: "medium",
 // };
-
-const puzzle = {
-    puzzle: "42897516337612894595136427881975362426784153953429681714258739678361945269543278-",
-    solution: "428975163376128945951364278819753624267841539534296817142587396783619452695432781",
-    difficulty: "medium",
-};
+//
+// const puzzle2 = {
+//     puzzle: "42897516337612894595136427881975362426784153953429681714258739678361945269543278-",
+//     solution: "428975163376128945951364278819753624267841539534296817142587396783619452695432781",
+//     difficulty: "medium",
+// };
 
 const [inputStyle, setInputStyle] = createSignal<'number' | 'note'>('number');
 const [noErrAnim, setNoErrAnim] = createSignal(false);
 const [winner, setWinner] = createSignal(false);
 const [winnerColorChange, setWinnerColorChange] = createSignal(0);
+const [puzzleDay, setPuzzleDay] = createSignal<Date | null>(null);
+const [solution, setSolution] = createSignal<string | null>(null);
+const [loading, setLoading] = createSignal(false);
+
+function isCorrectDay() {
+    return daysEqual(puzzleDay(), getDay());
+}
 
 function updateWinnerColorChange() {
     setWinnerColorChange(winnerColorChange() + 1);
@@ -38,7 +46,7 @@ setInterval(() => {
 
 const [paused, setPaused] = createSignal(false);
 
-const [history, setHistory] = createSignal(createInitialHistory(puzzle), { equals: false });
+const [history, setHistory] = createSignal<History | null>(null, { equals: false });
 
 function swapInputStyle() {
     if (inputStyle() === 'number') {
@@ -62,33 +70,52 @@ type GameState = {
 
 type History = GameState[];
 
-function saveHistory() {
+async function saveHistory() {
+    // If local storage is for a different day, clear it and load from server
+    if (!isCorrectDay()) {
+        localStorage.removeItem('sudoku');
+        await loadGameFromServer();
+    }
+
     localStorage.setItem('sudoku', JSON.stringify({
-        'saveTime': Date.now(),
         'paused': paused(),
         'seconds': seconds(),
         'inputStyle': inputStyle(),
         'history': history(),
+        'puzzleDay': puzzleDay(),
     }));
 }
 
-function createInitialHistory(puzzle: { puzzle: string }): History {
+async function loadHistory() {
     // Look in history first
-    const history = localStorage.getItem('sudoku');
-    if (history !== null) {
-        let parsed = JSON.parse(history);
+    const fromStorage = localStorage.getItem('sudoku');
+
+    if (fromStorage !== null) {
+        let { puzzleDay, seconds, paused, history } = JSON.parse(fromStorage);
+        puzzleDay = new Date(puzzleDay);
 
         // If the save is from today, we can use it
-        let dayToday = new Date().getDay();
-        let daySave = new Date(parsed.saveTime).getDay();
-        if (dayToday === daySave) {
-            setSeconds(parsed.seconds);
-            setPaused(parsed.paused);
-            return parsed.history;
+        if (daysEqual(puzzleDay, getDay())) {
+            setSeconds(seconds);
+            setPaused(paused);
+            setHistory(history);
+            setPuzzleDay(puzzleDay);
+
+            return;
         }
     }
 
-    const cells: CellState[] = puzzle.puzzle.split('').map((c) => {
+    await loadGameFromServer();
+}
+
+async function loadGameFromServer() {
+    setLoading(true);
+
+    // read from the `/sudoku/today` endpoint of the server
+    let res = await fetch('http://localhost:3001/sudoku/today');
+    let p = await res.json();
+
+    const cells: CellState[] = p.puzzle.split('').map((c) => {
         if (c === '-') {
             return {
                 value: null,
@@ -106,14 +133,24 @@ function createInitialHistory(puzzle: { puzzle: string }): History {
         };
     });
 
-    return [{
+    setHistory([{
         selectedCell: null,
         cells,
-    }];
+    }]);
+    setLoading(false);
+
+    setSolution(p.solution);
+
+    setSeconds(0);
+    setWinner(false);
+
+    setPuzzleDay(getDay());
 }
 
 function curGameState(): GameState {
     let h = history();
+    if (!h) { return h; }
+
     return h[h.length - 1];
 }
 
@@ -131,7 +168,7 @@ function updateSelectedCell(fn: (_: CellState) => void) {
 
     fn(newCells[gs.selectedCell]);
 
-    setHistory(h => [...h, { ...gs, cells: newCells }]);
+    setHistory(h => [...h!, { ...gs, cells: newCells }]);
 }
 
 function selectedNumber() {
@@ -201,7 +238,10 @@ function inputNumber(n: number) {
             }
         }
 
-        setHistory(h => [...h]);
+        setHistory(h => {
+            if (!h) { return h; };
+            return [...h];
+        });
     }
 }
 
@@ -209,7 +249,10 @@ function clearChecks() {
     for (let i = 0; i < 81; i++) {
         curGameState().cells[i].check = null;
     }
-    setHistory(h => [...h]);
+    setHistory(h => {
+        if (!h) { return h; }
+        return [...h];
+    });
 }
 
 function clearCell() {
@@ -231,6 +274,9 @@ function clearCell() {
 }
 
 function checkCell(n: number) {
+    const sol = solution();
+    if (!sol) { return; }
+
     const gs = curGameState();
 
     const cell = gs.cells[n];
@@ -247,7 +293,7 @@ function checkCell(n: number) {
     setNoErrAnim(true);
     setTimeout(() => setNoErrAnim(false), 1000);
 
-    if (cell.value.toString() == puzzle.solution[n]) {
+    if (cell.value.toString() == sol[n]) {
         cell.check = true;
     } else {
         cell.check = false;
@@ -258,11 +304,16 @@ function checkCells() {
     for (let i = 0; i < 81; i++) {
         checkCell(i);
     }
-    setHistory(h => [...h]);
+    setHistory(h => {
+        if (!h) { return h; }
+        return [...h];
+    });
 }
 
 function setSelectedCell(n: number) {
     setHistory(h => {
+        if (!h) { return h; }
+
         h[h.length - 1].selectedCell = n;
         return h;
     });
@@ -273,11 +324,14 @@ function undo() {
         return;
     }
 
-    if (history().length === 1) {
+    const h = history();
+    if (!h) { return; }
+
+    if (h.length === 1) {
         return;
     }
 
-    setHistory(history().slice(0, history().length - 1));
+    setHistory(h.slice(0, h.length - 1));
 }
 
 function allFilled(n: number | null) {
@@ -297,19 +351,19 @@ function allFilled(n: number | null) {
 }
 
 const Notes: Component<{ n: number }> = (props) => {
-    const notes = () => curGameState().cells[props.n].notes;
+    const notes = () => curGameState()?.cells[props.n]?.notes;
 
     return (
         <div class='grid grid-rows-3 grid-cols-3 w-full h-full'>
-            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes().includes(1) ? 1 : null}</div>
-            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes().includes(2) ? 2 : null}</div>
-            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes().includes(3) ? 3 : null}</div>
-            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes().includes(4) ? 4 : null}</div>
-            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes().includes(5) ? 5 : null}</div>
-            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes().includes(6) ? 6 : null}</div>
-            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes().includes(7) ? 7 : null}</div>
-            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes().includes(8) ? 8 : null}</div>
-            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes().includes(9) ? 9 : null}</div>
+            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes()?.includes(1) ? 1 : null}</div>
+            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes()?.includes(2) ? 2 : null}</div>
+            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes()?.includes(3) ? 3 : null}</div>
+            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes()?.includes(4) ? 4 : null}</div>
+            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes()?.includes(5) ? 5 : null}</div>
+            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes()?.includes(6) ? 6 : null}</div>
+            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes()?.includes(7) ? 7 : null}</div>
+            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes()?.includes(8) ? 8 : null}</div>
+            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes()?.includes(9) ? 9 : null}</div>
         </div>
     );
 }
@@ -585,14 +639,14 @@ const InputStyle: Component = () => {
             onClick={() => swapInputStyle()}
         >
             <button
-                style={`font-size: min(2.5vh, 5vw); ${transform('number')} `}
+                style={`font-size: min(2.5vh, 5vw); ${transform('number')}`}
                 class='flex flex-col justify-end items-center absolute transition-all'
             >
                 <TbNumbers color="rgb(47, 41, 36)" />
                 <span>Number</span>
             </button>
             <button
-                style={`font - size: min(2.5vh, 5vw); ${transform('note')} `}
+                style={`font-size: min(2.5vh, 5vw); ${transform('note')}`}
                 class='flex flex-col justify-end items-center relative transition-all'
             >
                 <BsPencil color="rgb(47, 41, 36)" />
@@ -608,7 +662,7 @@ const SudokuIcons: Component = () => {
             <button
                 style='font-size: min(2.5vh, 5vw)'
                 class='flex flex-col justify-end items-center border border-stone-800 text-stone-700 bg-white rounded-md py-1 m-1 hover:bg-none sm:hover:bg-red-100 active:bg-red-200 sm:active:bg-red-200'
-                disabled={paused() || history().length === 1}
+                disabled={paused() || history()?.length === 1}
                 onClick={() => undo()}
             >
                 <IoArrowUndoOutline color="rgb(47, 41, 36)" />
@@ -666,14 +720,21 @@ const Timer: Component = () => {
 
 export const Sudoku: Component = () => {
     onMount(() => {
+        loadHistory();
+
         createEffect(() => {
             saveHistory();
         });
 
         createEffect(() => {
-            if (curGameState().cells.every((c) => c.value !== null)) {
+            const gs = curGameState();
+            const sol = solution();
+
+            if (!gs || !sol) { return; }
+
+            if (gs.cells.every((c) => c.value !== null)) {
                 for (let i = 0; i < 81; i++) {
-                    if (curGameState().cells[i].value?.toString() !== puzzle.solution[i]) {
+                    if (gs.cells[i].value?.toString() !== sol[i]) {
                         return;
                     }
                 }
@@ -695,7 +756,7 @@ export const Sudoku: Component = () => {
 
         window.addEventListener('keydown', (e) => {
             const gs = curGameState();
-            if (gs.selectedCell === null) {
+            if (gs?.selectedCell === null) {
                 return;
             }
 
@@ -771,15 +832,17 @@ export const Sudoku: Component = () => {
     });
 
     return (
-        <div class='h-[90vh] flex flex-col justify-between items-center lg:flex-row lg:justify-center m-1'>
-            <div class='flex flex-col max-h-[50vh] max-w-[50vh] w-full lg:max-h-[75vh] lg:max-w-[75vh]'>
-                <Timer />
-                <SudokuBoard />
+        <Show when={history() !== null && !loading()} fallback={<div>Loading...</div>}>
+            <div class='h-[90vh] flex flex-col justify-between items-center lg:flex-row lg:justify-center m-1'>
+                <div class='flex flex-col max-h-[50vh] max-w-[50vh] w-full lg:max-h-[75vh] lg:max-w-[75vh]'>
+                    <Timer />
+                    <SudokuBoard />
+                </div>
+                <div>
+                    <SudokuIcons />
+                    <SudokuNumberPad />
+                </div>
             </div>
-            <div>
-                <SudokuIcons />
-                <SudokuNumberPad />
-            </div>
-        </div>
+        </Show>
     );
 };

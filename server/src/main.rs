@@ -1,18 +1,42 @@
 // #![feature(test)]
 
-use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
-use sqlx::postgres::{PgConnectOptions, PgPool, PgPoolOptions, PgSslMode};
+mod squarewordgen;
+mod sudokugen;
+
+use axum::{
+    async_trait,
+    extract::{FromRequestParts, State},
+    headers::{authorization::Bearer, Authorization},
+    http::{request::Parts, StatusCode},
+    response::{IntoResponse, Response},
+    routing::{get, post},
+    Json, Router, TypedHeader,
+};
+use chrono::{DateTime, Utc};
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Validation};
+use serde::{Deserialize, Serialize};
+use sqlx::{
+    postgres::{PgConnectOptions, PgPoolOptions, PgSslMode},
+    PgPool,
+};
 use sudokugen::Sudoku;
+use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use uuid::Uuid;
 
 use std::{net::SocketAddr, time::Duration};
 
-pub mod squarewordgen;
-pub mod sudokugen;
+const SECRET: &str = "secret";
 
 async fn sudoku_today() -> Json<Sudoku> {
     // todo(chad): retrieve from database. If not found for today, then save it.
-    Json(sudokugen::generate(sudokugen::Difficulty::Medium))
+    // Json(sudokugen::generate(sudokugen::Difficulty::Medium))
+    Json(Sudoku {
+        puzzle: "42897516337612894595136427881975362426784153953429681714258739678361945269543278-",
+        solution:
+            "428975163376128945951364278819753624267841539534296817142587396783619452695432781",
+        difficulty: sudokugen::Difficulty::Medium,
+    })
 }
 
 async fn squareword_today() -> Json<String> {
@@ -20,23 +44,192 @@ async fn squareword_today() -> Json<String> {
     Json(squarewordgen::generate().to_string())
 }
 
-// async fn using_connection_pool_extractor(
-//     State(pool): State<PgPool>,
-// ) -> Result<String, (StatusCode, String)> {
-//     sqlx::query_scalar("select 'hello world from pg'")
-//         .fetch_one(&pool)
-//         .await
-//         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
-// }
+#[derive(sqlx::FromRow, Serialize, Deserialize, Debug)]
+struct User {
+    id: Uuid,
+    name: String,
+    email: String,
+    picture: String,
+    created_at: DateTime<Utc>,
+    last_login: DateTime<Utc>,
+}
 
-async fn migrate_up(State(pool): State<PgPool>) -> Result<(), (StatusCode, String)> {
-    sqlx::migrate!()
-        .run(&pool)
+#[derive(Debug, Serialize, Deserialize)]
+struct GoogleJwt {
+    iss: String,
+    aud: String,
+    sub: String,
+    email: String,
+    email_verified: bool,
+    name: String,
+    picture: String,
+    given_name: String,
+    family_name: String,
+    iat: i64,
+    exp: i64,
+    jti: String,
+}
+
+#[derive(Deserialize)]
+struct GoogleCert {
+    kid: String,
+    e: String,
+    n: String,
+}
+
+#[derive(Deserialize)]
+struct GoogleCerts {
+    keys: Vec<GoogleCert>,
+}
+
+#[derive(Deserialize)]
+struct LoginRequest {
+    token: String,
+}
+
+async fn login(
+    State(pool): State<PgPool>,
+    Json(req): Json<LoginRequest>,
+) -> Result<String, (StatusCode, String)> {
+    tracing::debug!("login token: {:?}", req.token);
+
+    let header = jsonwebtoken::decode_header(&req.token).unwrap();
+    let kid = match header.kid {
+        Some(k) => k,
+        None => todo!(),
+    };
+
+    let client = reqwest::Client::new();
+    let res = client
+        .get("https://www.googleapis.com/oauth2/v3/certs")
+        .send()
+        .await.map_err(|e| (StatusCode::SERVICE_UNAVAILABLE, format!("Failed to query 'https://www.googleapis.com/oauth2/v3/certs' for certs: {:?}", e)))?
+        .json::<GoogleCerts>()
+        .await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to decode 'https://www.googleapis.com/oauth2/v3/certs' cert response: {:?}", e)))?;
+
+    let key = res.keys.iter().find(|k| k.kid == kid).unwrap();
+
+    let token = jsonwebtoken::decode::<GoogleJwt>(
+        &req.token,
+        &DecodingKey::from_rsa_components(&key.n, &key.e).unwrap(),
+        &Validation::new(Algorithm::RS256),
+    )
+    .map_err(|e| {
+        (
+            StatusCode::UNAUTHORIZED,
+            format!("Failed to decode token: {:?}", e),
+        )
+    })?;
+
+    // Look for an existing user. If not, create one
+    let user: Option<User> = sqlx::query_as("select * from users where email = $1")
+        .bind(&token.claims.email)
+        .fetch_optional(&pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    Ok(())
+    // Save the user if they don't exist, else create a new one
+    let user = match user {
+        Some(user) => {
+            // Update last login time
+            sqlx::query("update users set last_login = $1 where id = $2")
+                .bind(&Utc::now())
+                .bind(&user.id)
+                .execute(&pool)
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+            user
+        }
+        None => {
+            let user = User {
+                id: Uuid::new_v4(),
+                name: token.claims.name.clone(),
+                email: token.claims.email.clone(),
+                picture: token.claims.picture.clone(),
+                created_at: Utc::now(),
+                last_login: Utc::now(),
+            };
+
+            sqlx::query("insert into users (id, name, email, picture, created_at, last_login) values ($1, $2, $3, $4, $5, $6)")
+                .bind(&user.id)
+                .bind(&user.name)
+                .bind(&user.email)
+                .bind(&user.picture)
+                .bind(&user.created_at)
+                .bind(&user.last_login)
+                .execute(&pool)
+                .await
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+            user
+        }
+    };
+
+    tracing::debug!("decoded token: {:?}", token);
+
+    let token = jsonwebtoken::encode(
+        &jsonwebtoken::Header::default(),
+        &user,
+        &EncodingKey::from_secret(SECRET.as_ref()),
+    )
+    .unwrap();
+
+    Ok(token)
 }
+
+#[async_trait]
+impl<S> FromRequestParts<S> for User
+where
+    S: Send + Sync,
+{
+    type Rejection = Response;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let TypedHeader(Authorization(token)) =
+            TypedHeader::<Authorization<Bearer>>::from_request_parts(parts, state)
+                .await
+                .map_err(|e| e.into_response())?;
+
+        let mut validation = Validation::new(Algorithm::HS256);
+        validation.validate_exp = false;
+        validation.required_spec_claims.clear();
+        let token_user = jsonwebtoken::decode::<User>(
+            &token.token(),
+            &DecodingKey::from_secret(SECRET.as_ref()),
+            &validation,
+        )
+        .map_err(|e| {
+            Response::builder()
+                .status(StatusCode::UNAUTHORIZED)
+                .body(format!("Failed to decode token: {:?}", e))
+                .unwrap()
+                .into_response()
+        })?;
+
+        tracing::debug!("Decoded user: {:?}", token_user.claims);
+
+        Ok(token_user.claims)
+    }
+}
+
+async fn check_auth(user: User) -> Result<String, (StatusCode, String)> {
+    Ok(format!("{:?}", user))
+}
+
+// async fn save_squareword(
+//     user: User,
+//     puzzle_id: Uuid,
+//     guesses: String,
+//     State(pool): State<PgPool>,
+// ) -> Result<(), (StatusCode, String)> {
+//     tracing::debug!("saving squareword: {} {} {}", user_id, puzzle_id, guesses);
+//     sqlx::query!("insert into squareword_scores (user_id, puzzle_id, guesses) values ($1, $2, $3)", user_id, puzzle_id, guesses)
+//         .execute(&pool)
+//         .await
+//         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+//     Ok(())
+// }
 
 #[tokio::main]
 async fn main() {
@@ -67,6 +260,9 @@ async fn main() {
     let app = Router::new()
         .route("/sudoku/today", get(sudoku_today))
         .route("/squareword/today", get(squareword_today))
+        .route("/login", post(login))
+        .route("/check_auth", get(check_auth))
+        .layer(CorsLayer::permissive())
         .with_state(pool);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3001));

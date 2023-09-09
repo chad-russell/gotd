@@ -1,4 +1,4 @@
-import { Component, createSignal, onMount } from "solid-js";
+import { Component, createEffect, createSignal, onMount } from "solid-js";
 
 export const [token, setToken] = createSignal<string | null>(null);
 
@@ -9,9 +9,26 @@ export function loggedIn() {
 const LoginButton: Component = () => {
     const btn = <div id="buttonDiv"></div>;
 
-    function handleCredentialResponse(response: { credential: any; }) {
-        localStorage.setItem('token', response.credential);
-        setToken(response.credential);
+    async function handleCredentialResponse(response: { credential: any; }) {
+        // send response.credential to backend for validation
+        // if valid, setToken(response.credential)
+        // else, show error message
+        const res = await fetch('http://localhost:3001/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ token: response.credential })
+        });
+
+        const text = await res.text();
+
+        if (res.status !== 200) {
+            alert(`Login failed: ${text}`);
+            return;
+        }
+
+        setToken(text);
     }
 
     onMount(() => {

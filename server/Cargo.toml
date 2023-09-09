@@ -1,16 +1,21 @@
 [package]
-name = "server"
+name = "gotd"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = "0.6.20"
+axum = { version = "0.6.20", features = ["headers"] }
+chrono = { version = "0.4.29", features = ["serde"] }
+jsonwebtoken = "8.3.0"
 openssl = "0.10.56"
 postgres-openssl = "0.5.0"
 rand = "0.8.5"
+reqwest = { version = "0.11.20", features = ["json"] }
 serde = { version = "1.0.183", features = ["derive"] }
-sqlx = { version = "0.7.1", features = ["runtime-tokio-rustls", "any", "postgres"] }
+sqlx = { version = "0.7.1", features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono"] }
 tokio = { version = "1.30.0", features = ["full"] }
 tokio-postgres = "0.7.8"
+tower-http = { version = "0.4.4", features = ["cors"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+uuid = { version = "1.4.1", features = ["v4", "serde"] }

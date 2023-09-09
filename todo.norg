@@ -1,0 +1,17 @@
+* (-) TODO
+** (-) Sudoku 
+*** (-) Frontend
+**** (x) Pull new game from backend
+**** ( ) Upon win, call save_sudoku endpoint
+** (-) Squareword
+*** (-) Frontend
+**** (x) Modal for guess history
+**** ( ) Don't allow to guess the same word twice
+**** ( ) Detect win condition and show colorful happy squares
+**** (x) Pull new game from backend
+**** ( ) Upon win, call save_squareword endpoint
+** (-) General
+*** (-) Backend
+**** (x) Receive auth from frontend, create user if needed, hand back JWT token
+**** ( ) Create save_sudoku endpoint
+**** ( ) Create save_squareword endpoint
