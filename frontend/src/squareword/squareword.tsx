@@ -4,9 +4,12 @@ import { FaSolidCheck } from 'solid-icons/fa';
 import { DICTIONARY } from './dictionary';
 import { daysEqual, getDay } from '../util';
 import { Portal } from 'solid-js/web';
+import { setToken, token } from '../auth/auth';
 
-const [answer, setAnswer] = createSignal<Array<string> | null>(null);
+const [solution, setSolution] = createSignal<Array<string> | null>(null);
 const [puzzleDay, setPuzzleDay] = createSignal<Date | null>(null);
+const [id, setId] = createSignal<string | null>(null);
+const [loading, setLoading] = createSignal(false);
 
 const [guess, setGuess] = createSignal<Array<string>>([]);
 
@@ -23,6 +26,8 @@ const [animatedRow5, setAnimatedRow5] = createSignal<boolean>(false);
 
 const [guessError, setGuessError] = createSignal<boolean>(false);
 
+const [winner, setWinner] = createSignal(false);
+
 function isCorrectDay() {
     return daysEqual(puzzleDay(), getDay());
 }
@@ -35,23 +40,106 @@ async function saveHistory() {
     }
 
     localStorage.setItem('squareword', JSON.stringify({
-        'answer': answer(),
+        'id': id(),
+        'solution': solution(),
         'guess': guess(),
         'guessHistory': guessHistory(),
         'puzzleDay': puzzleDay(),
+        'winner': winner(),
     }));
+}
+
+function correctLetter(row: number, col: number) {
+    return solution()![row - 1][col];
+}
+
+function animatingRow(row: number): boolean {
+    return (row == 1 && animatedRow1()) ||
+        (row == 2 && animatedRow2()) ||
+        (row == 3 && animatedRow3()) ||
+        (row == 4 && animatedRow4()) ||
+        (row == 5 && animatedRow5());
+}
+
+function animatingRowOrBelow(row: number): boolean {
+    let animatedRow = null;
+    if (animatedRow1()) {
+        animatedRow = 1;
+    }
+    if (animatedRow2()) {
+        animatedRow = 2;
+    }
+    if (animatedRow3()) {
+        animatedRow = 3;
+    }
+    if (animatedRow4()) {
+        animatedRow = 4;
+    }
+    if (animatedRow5()) {
+        animatedRow = 5;
+    }
+
+    if (animatedRow == null) {
+        return false;
+    }
+
+    return animatedRow >= row;
+}
+
+function alreadyGuessedCorrectSolution(row: number, col: number): boolean {
+    if (guessHistory().length < 1) {
+        return false;
+    }
+
+    let toSub = 1;
+    if (guessError()) {
+        toSub = 0;
+    }
+
+    for (let guess of guessHistory().slice(0, guessHistory().length - toSub)) {
+        if (guess[col] == correctLetter(row, col)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function winnerRow(row: number, col: number): boolean {
+    if (alreadyGuessedCorrectSolution(row, col)) {
+        return true;
+    }
+
+    if (guessLock() && !animatingRowOrBelow(row)) {
+        return false;
+    }
+
+    for (let guess of guessHistory()) {
+        if (guess[col] == correctLetter(row, col)) {
+            return true;
+        }
+    }
+
+    if (animatingRow(row)) {
+        return false;
+    }
+
+    return false;
 }
 
 async function loadHistory() {
     const fromStorage = localStorage.getItem('squareword');
 
     if (fromStorage) {
-        let { puzzleDay, answer, guess, guessHistory } = JSON.parse(fromStorage);
+        let { id, puzzleDay, solution, guess, guessHistory, winner } = JSON.parse(fromStorage);
+
         puzzleDay = new Date(puzzleDay);
 
         // If the save is from today, we can use it
         if (daysEqual(puzzleDay, getDay())) {
-            setAnswer(answer);
+            setWinner(winner);
+            setId(id);
+            setSolution(solution);
             setGuess(guess);
             setGuessHistory(guessHistory);
             setPuzzleDay(puzzleDay);
@@ -64,20 +152,87 @@ async function loadHistory() {
 }
 
 async function loadGameFromServer() {
-    setAnswer(null);
+    if (loading()) {
+        return;
+    }
+    setLoading(true);
 
     // read from the `/squareword/today` endpoint of the server
-    let res = await fetch('http://localhost:3001/squareword/today');
-    let answer = await res.json();
-    setAnswer([
-        answer.slice(0, 5),
-        answer.slice(5, 10),
-        answer.slice(10, 15),
-        answer.slice(15, 20),
-        answer.slice(20, 25),
+    const res = await fetch('http://localhost:3001/squareword/today');
+    const resJson = await res.json();
+
+    const sol = resJson.solution;
+
+    setId(resJson.id);
+
+    let [y, m, d] = resJson.day.split('-');
+    let date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+    setPuzzleDay(new Date(date));
+
+    if (resJson.guesses != null) {
+        let guesses = [];
+        while (resJson.guesses.length > 0) {
+            guesses.push(resJson.guesses.slice(0, 5));
+            resJson.guesses = resJson.guesses.slice(5);
+        }
+        setWinner(true);
+        setGuessHistory(guesses);
+    }
+
+    setSolution([
+        sol.slice(0, 5),
+        sol.slice(5, 10),
+        sol.slice(10, 15),
+        sol.slice(15, 20),
+        sol.slice(20, 25),
     ]);
 
-    setPuzzleDay(getDay());
+    localStorage.setItem('squareword', JSON.stringify({
+        'id': id(),
+        'solution': solution(),
+        'guess': [],
+        'guessHistory': guessHistory(),
+        'puzzleDay': puzzleDay(),
+        'winner': winner(),
+    }));
+
+    setLoading(false);
+}
+
+async function saveScore() {
+    const res = await fetch('http://localhost:3001/squareword/score', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token()}`,
+        },
+        body: JSON.stringify({
+            puzzle_id: id(),
+            guesses: guessHistory().join(''),
+        }),
+    });
+
+    if (res.status === 401) {
+        setToken(null);
+        return;
+    }
+
+    else if (res.status !== 200) {
+        console.log('Error saving score');
+        return;
+    }
+}
+
+function notifyGuessError() {
+    setGuessLock(true);
+    setTimeout(() => {
+        setGuessLock(false);
+    }, 302);
+
+    setGuessError(true);
+    setTimeout(() => {
+        setGuessError(false);
+    }, 301);
 }
 
 function enterGuess() {
@@ -85,16 +240,15 @@ function enterGuess() {
         return;
     }
 
-    if (!DICTIONARY.includes(guess().join(''))) {
-        setGuessLock(true);
-        setTimeout(() => {
-            setGuessLock(false);
-        }, 302);
+    for (let g of guessHistory()) {
+        if (g == guess().join('')) {
+            notifyGuessError();
+            return;
+        }
+    }
 
-        setGuessError(true);
-        setTimeout(() => {
-            setGuessError(false);
-        }, 301);
+    if (!DICTIONARY.includes(guess().join(''))) {
+        notifyGuessError();
         return;
     }
 
@@ -230,8 +384,19 @@ const KeyboardLetter: Component<{ letter: string }> = (props) => {
         style='font-size: min(6vw, 4vh)'
         class={`py-1 px-2 md:px-3 mx-[1px] md:mx-[2px] border border-stone-800 rounded-md select-none ${colorClasses()}`}
         onClick={() => {
-            guess().push(props.letter);
-            setGuess([...guess()]);
+            if (props.letter == 'DEL') {
+                if (guess().length > 0) {
+                    guess().pop();
+                    setGuess([...guess()]);
+                }
+            }
+            else if (props.letter == 'ENT') {
+                enterGuess();
+            }
+            else {
+                guess().push(props.letter);
+                setGuess([...guess()]);
+            }
         }}
     >
         {letter}
@@ -275,84 +440,48 @@ const GuessTile: Component<{ index: number }> = (props) => {
 };
 
 const ViewGuessTile: Component = () => {
+    function pluralize(n: number, s: string) {
+        if (n == 1) {
+            return `${s}`;
+        }
+        else {
+            return `${s}es`;
+        }
+    }
+
+    function value() {
+        return (
+            <div class='flex flex-col items-center justify-center'>
+                <span class='text-xl'>{guessHistory().length}</span>
+                <span class='text-xs md:text-xl'>{pluralize(guessHistory().length, 'Guess')}</span>
+            </div>
+        );
+    }
+
     return (
-        <div class='bg-blue-500 border border-blue-800 rounded-md m-[1px]' onClick={() => setShowGuess(!showGuess())} />
+        <div class='bg-blue-500 border border-blue-800 rounded-md m-[1px] flex flex-col items-center justify-center' onClick={() => setShowGuess(!showGuess())}>
+            {value()}
+        </div>
     );
 };
 
 const SolutionTile: Component<{ col: number, row: number }> = (props) => {
-    if (!answer()) {
+    if (!solution()) {
         return <div />;
     }
 
-    function correctLetter() {
-        return answer()![props.row - 1][props.col];
-    }
-
-    function animatingSelf(): boolean {
-        return (props.row == 1 && animatedRow1()) ||
-            (props.row == 2 && animatedRow2()) ||
-            (props.row == 3 && animatedRow3()) ||
-            (props.row == 4 && animatedRow4()) ||
-            (props.row == 5 && animatedRow5());
-    }
-
-    function animatingSelfOrBelow(): boolean {
-        let animatedRow = null;
-        if (animatedRow1()) {
-            animatedRow = 1;
-        }
-        if (animatedRow2()) {
-            animatedRow = 2;
-        }
-        if (animatedRow3()) {
-            animatedRow = 3;
-        }
-        if (animatedRow4()) {
-            animatedRow = 4;
-        }
-        if (animatedRow5()) {
-            animatedRow = 5;
-        }
-
-        if (animatedRow == null) {
-            return false;
-        }
-
-        return animatedRow >= props.row;
-    }
-
-    function alreadyGuessedCorrectAnswer(): boolean {
-        if (guessHistory().length < 1) {
-            return false;
-        }
-
-        let toSub = 1;
-        if (guessError()) {
-            toSub = 0;
-        }
-
-        for (let guess of guessHistory().slice(0, guessHistory().length - toSub)) {
-            if (guess[props.col] == correctLetter()) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     function letter(): string {
-        if (alreadyGuessedCorrectAnswer()) {
-            return correctLetter().toUpperCase();
+        if (alreadyGuessedCorrectSolution(props.row, props.col)) {
+            return correctLetter(props.row, props.col).toUpperCase();
         }
 
-        if (guessLock() && !animatingSelfOrBelow()) {
+        if (guessLock() && !animatingRowOrBelow(props.row)) {
             return '';
         }
 
         for (let guess of guessHistory()) {
-            if (guess[props.col] == correctLetter()) {
-                return correctLetter().toUpperCase();
+            if (guess[props.col] == correctLetter(props.row, props.col)) {
+                return correctLetter(props.row, props.col).toUpperCase();
             }
         }
 
@@ -360,11 +489,11 @@ const SolutionTile: Component<{ col: number, row: number }> = (props) => {
     }
 
     function animateReveal(): string {
-        if (alreadyGuessedCorrectAnswer()) {
+        if (alreadyGuessedCorrectSolution(props.row, props.col)) {
             return '';
         }
 
-        if (!animatingSelf()) {
+        if (!animatingRow(props.row)) {
             return '';
         }
 
@@ -376,17 +505,17 @@ const SolutionTile: Component<{ col: number, row: number }> = (props) => {
     }
 
     function animateBg() {
-        if (alreadyGuessedCorrectAnswer()) {
+        if (alreadyGuessedCorrectSolution(props.row, props.col)) {
             return 'bg-green-500';
         }
 
-        if (guessLock() && !animatingSelfOrBelow()) {
+        if (guessLock() && !animatingRowOrBelow(props.row)) {
             return '';
         }
 
         for (let guess of guessHistory()) {
-            if (guess[props.col] == correctLetter()) {
-                if (animatingSelf()) {
+            if (guess[props.col] == correctLetter(props.row, props.col)) {
+                if (animatingRow(props.row)) {
                     return 'animate-wowFadeIn bg-green-500';
                 }
 
@@ -394,16 +523,25 @@ const SolutionTile: Component<{ col: number, row: number }> = (props) => {
             }
         }
 
-        if (animatingSelf()) {
+        if (animatingRow(props.row)) {
             return 'animate-wow';
         }
 
         return '';
     }
 
+    function value() {
+        if (winner()) {
+            return '🎉';
+        }
+        else {
+            return letter();
+        }
+    }
+
     return (
         <div class={`border border-stone-800 rounded-md m-[1px] overflow-hidden flex flex-col justify-center items-center ${animateBg()}`}>
-            <span style='font-size: min(6vw, 5vh);' class={`${animateReveal()}`}>{letter()}</span>
+            <span style='font-size: min(6vw, 5vh);' class={`${animateReveal()}`}>{value()}</span>
         </div>
     );
 };
@@ -411,7 +549,7 @@ const SolutionTile: Component<{ col: number, row: number }> = (props) => {
 function misplacedLetters(row: number): Array<string> {
     const ml = new Set<string>();
 
-    const a = answer();
+    const a = solution();
     const gLen = guessHistory().length;
 
     if (!a || gLen == 0) {
@@ -453,23 +591,58 @@ function misplacedLetters(row: number): Array<string> {
 }
 
 const MisplacedLettersTile: Component<{ row: number }> = (props) => {
+    function value() {
+        if (winner()) {
+            return '🎉';
+        }
+        else {
+            return [...misplacedLetters(props.row).map((ml) => ml.toUpperCase())].join(' ');
+        }
+    }
+
+    function fontSize() {
+        if (winner()) {
+            return 'min(6vw, 5vh)';
+        }
+        else {
+            return 'min(3vw, 2vh)';
+        }
+    }
+
     return (
-        <div style='font-size: min(3vw, 2vh)' class='flex flex-row items-center justify-center bg-yellow-400 border border-stone-800 rounded-md m-[1px]'>
-            {[...misplacedLetters(props.row).map((ml) => ml.toUpperCase())].join(' ')}
+        <div style={`font-size: ${fontSize()}`} class='flex flex-row items-center justify-center bg-yellow-400 border border-stone-800 rounded-md m-[1px]'>
+            {value()}
         </div>
     );
 };
 
 const SquarewordBoard: Component = () => {
+    function guessRow() {
+        if (winner()) {
+            return (
+                <div class='col-span-6 flex flex-row items-center justify-center text-3xl md:text-4xl lg:text-5xl text-slate-700 select-none'>
+                    <span>WINNER!!</span>
+                    <span class='ml-3 text-blue-700' onClick={() => setShowGuess(true)}>{`(${guessHistory().length}) Guesses`}</span>
+                </div>
+            );
+        }
+        else {
+            return (
+                <>
+                    <GuessTile index={0} />
+                    <GuessTile index={1} />
+                    <GuessTile index={2} />
+                    <GuessTile index={3} />
+                    <GuessTile index={4} />
+                    <ViewGuessTile />
+                </>
+            );
+        }
+    }
     return (
         <div class='grid grid-cols-6 grid-rows-6 overflow-hidden aspect-square p-3'>
             {/* Guess Row */}
-            <GuessTile index={0} />
-            <GuessTile index={1} />
-            <GuessTile index={2} />
-            <GuessTile index={3} />
-            <GuessTile index={4} />
-            <ViewGuessTile />
+            {guessRow()}
 
             {/* Solution Row 1 */}
             <SolutionTile col={0} row={1} />
@@ -523,7 +696,7 @@ const GuessModal = () => {
             <div class='w-1/2 max-w-[200px] h-1/2 py-2 bg-blue-300 p-30 flex flex-col items-center justify-center rounded-md' onClick={(e) => { e.stopPropagation() }}>
                 <div class='overflow-scroll w-full flex flex-col items-center'>
                     <For each={guessHistory()}>
-                        {(guess) => <div class='text-2xl'>{guess}</div>}
+                        {(guess) => <div class='text-2xl my-2'>{guess.toUpperCase()}</div>}
                     </For>
                 </div>
             </div>
@@ -537,6 +710,34 @@ export const Squareword: Component = () => {
 
         createEffect(() => {
             saveHistory();
+        });
+
+        createEffect(() => {
+            const a = solution();
+            const gs = guessHistory();
+
+            if (!a) {
+                return;
+            }
+
+            if (gs.length < 5) {
+                return;
+            }
+
+            for (let row = 1; row < 6; row++) {
+                for (let col = 1; col < 6; col++) {
+                    if (!winnerRow(row, col)) {
+                        return false;
+                    }
+                }
+            }
+
+            if (winner()) {
+                return;
+            }
+
+            setWinner(true);
+            saveScore();
         });
     });
 
@@ -568,7 +769,7 @@ export const Squareword: Component = () => {
     });
 
     return (
-        <Show when={answer()} fallback={<div>Loading...</div>}>
+        <Show when={id() && !loading()} fallback={<div>Loading...</div>}>
             <div class='h-[90vh] flex flex-col justify-center items-center m-1'>
                 <div class='flex flex-col max-h-[90vh] max-w-[60vh] w-full'>
                     <SquarewordBoard />

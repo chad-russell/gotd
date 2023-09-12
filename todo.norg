@@ -6,8 +6,8 @@
 ** (-) Squareword
 *** (-) Frontend
 **** (x) Modal for guess history
-**** ( ) Don't allow to guess the same word twice
-**** ( ) Detect win condition and show colorful happy squares
+**** (x) Don't allow to guess the same word twice
+**** (x) Detect win condition and show colorful happy squares
 **** (x) Pull new game from backend
 **** ( ) Upon win, call save_squareword endpoint
 ** (-) General

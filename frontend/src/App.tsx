@@ -18,7 +18,7 @@ const SudokuHome: Component = () => {
 const SquarewordHome: Component = () => {
     return (
         <div class='h-[99vh] w-screen'>
-            <h2 class='text-3xl md:text-4xl lg:text-5xl lg:pt-10 text-center my-2 h-[7vh] select-none text-slate-700'>
+            <h2 class='text-2xl md:text-4xl lg:text-5xl lg:pt-10 text-center my-2 h-[7vh] select-none text-slate-700'>
                 Daily Squareword (August 21)
             </h2>
             <Squareword />
@@ -28,7 +28,7 @@ const SquarewordHome: Component = () => {
 
 const Home: Component = () => {
     function logout() {
-        localStorage.removeItem('token');
+        localStorage.clear();
         setToken(null);
         window.location.href = '/';
     }

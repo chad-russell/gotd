@@ -4,7 +4,8 @@ import { TbNumbers } from 'solid-icons/tb'
 import { FiDelete } from 'solid-icons/fi'
 import { BsPatchQuestionFill, BsPauseCircle, BsPlayCircle } from 'solid-icons/bs'
 import { BsPencil } from 'solid-icons/bs'
-import { dateAtMidnight, daysEqual, getDay } from '../util';
+import { daysEqual, getDay } from '../util';
+import { setToken, token } from '../auth/auth';
 
 // const puzzle = {
 //     puzzle: "--89---6---6-2--45951----7----7-3----6-8---3---4--6-1---2---39-78-6---526-5-3----",
@@ -20,11 +21,19 @@ import { dateAtMidnight, daysEqual, getDay } from '../util';
 
 const [inputStyle, setInputStyle] = createSignal<'number' | 'note'>('number');
 const [noErrAnim, setNoErrAnim] = createSignal(false);
-const [winner, setWinner] = createSignal(false);
 const [winnerColorChange, setWinnerColorChange] = createSignal(0);
 const [puzzleDay, setPuzzleDay] = createSignal<Date | null>(null);
 const [solution, setSolution] = createSignal<string | null>(null);
 const [loading, setLoading] = createSignal(false);
+const [id, setId] = createSignal<string | null>(null);
+
+const [winner, setWinner] = createSignal(false);
+function win() {
+    setWinner(true);
+    setPaused(true);
+    setWinnerColorChange(0);
+    setTimeout(updateWinnerColorChange, 500);
+}
 
 function isCorrectDay() {
     return daysEqual(puzzleDay(), getDay());
@@ -78,11 +87,13 @@ async function saveHistory() {
     }
 
     localStorage.setItem('sudoku', JSON.stringify({
+        'id': id(),
         'paused': paused(),
         'seconds': seconds(),
         'inputStyle': inputStyle(),
         'history': history(),
         'puzzleDay': puzzleDay(),
+        'solution': solution(),
     }));
 }
 
@@ -91,15 +102,17 @@ async function loadHistory() {
     const fromStorage = localStorage.getItem('sudoku');
 
     if (fromStorage !== null) {
-        let { puzzleDay, seconds, paused, history } = JSON.parse(fromStorage);
+        let { id, puzzleDay, seconds, paused, history, solution } = JSON.parse(fromStorage);
         puzzleDay = new Date(puzzleDay);
 
         // If the save is from today, we can use it
         if (daysEqual(puzzleDay, getDay())) {
+            setId(id);
             setSeconds(seconds);
             setPaused(paused);
             setHistory(history);
             setPuzzleDay(puzzleDay);
+            setSolution(solution);
 
             return;
         }
@@ -109,13 +122,16 @@ async function loadHistory() {
 }
 
 async function loadGameFromServer() {
+    if (loading()) {
+        return;
+    }
     setLoading(true);
 
     // read from the `/sudoku/today` endpoint of the server
     let res = await fetch('http://localhost:3001/sudoku/today');
     let p = await res.json();
 
-    const cells: CellState[] = p.puzzle.split('').map((c) => {
+    const cells: CellState[] = p.puzzle.split('').map((c: string) => {
         if (c === '-') {
             return {
                 value: null,
@@ -137,14 +153,23 @@ async function loadGameFromServer() {
         selectedCell: null,
         cells,
     }]);
-    setLoading(false);
 
     setSolution(p.solution);
 
-    setSeconds(0);
-    setWinner(false);
+    setId(p.id);
 
-    setPuzzleDay(getDay());
+    setSeconds(0);
+
+    if (p.seconds != null) {
+        setSeconds(p.seconds);
+        win();
+    }
+
+    let [y, m, d] = p.day.split('-');
+    let date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+    setPuzzleDay(date);
+
+    setLoading(false);
 }
 
 function curGameState(): GameState {
@@ -718,6 +743,30 @@ const Timer: Component = () => {
     );
 }
 
+async function saveScore() {
+    const res = await fetch('http://localhost:3001/sudoku/score', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token()}`,
+        },
+        body: JSON.stringify({
+            puzzle_id: id(),
+            seconds: seconds(),
+        }),
+    });
+
+    if (res.status === 401) {
+        setToken(null);
+        return;
+    }
+
+    else if (res.status !== 200) {
+        console.log('Error saving score');
+        return;
+    }
+}
+
 export const Sudoku: Component = () => {
     onMount(() => {
         loadHistory();
@@ -735,22 +784,16 @@ export const Sudoku: Component = () => {
             if (gs.cells.every((c) => c.value !== null)) {
                 for (let i = 0; i < 81; i++) {
                     if (gs.cells[i].value?.toString() !== sol[i]) {
+                        console.log('wincheck 4');
                         return;
                     }
                 }
 
-                setWinner(true);
-
-                setWinnerColorChange(0);
-                setTimeout(updateWinnerColorChange, 500);
+                console.log('YOU WIN!!!!');
+                win();
+                saveScore();
             } else {
                 setWinner(false);
-            }
-        });
-
-        createEffect(() => {
-            if (winner()) {
-                setPaused(true);
             }
         });
 
@@ -832,7 +875,7 @@ export const Sudoku: Component = () => {
     });
 
     return (
-        <Show when={history() !== null && !loading()} fallback={<div>Loading...</div>}>
+        <Show when={id() != null && history() !== null && !loading()} fallback={<div>Loading...</div>}>
             <div class='h-[90vh] flex flex-col justify-between items-center lg:flex-row lg:justify-center m-1'>
                 <div class='flex flex-col max-h-[50vh] max-w-[50vh] w-full lg:max-h-[75vh] lg:max-w-[75vh]'>
                     <Timer />

@@ -52,8 +52,8 @@ export const LoginScreen: Component = () => {
             <h2 class='text-3xl md:text-4xl lg:text-5xl text-center my-2 h-[7vh] select-none'>
                 Welcome to GOTD!
             </h2>
-            <span class='text-xl'>
-                Sign in using the button below, or the one in the top right corner if you see it.
+            <span class='text-xl text-center mx-4 mb-3'>
+                Sign in using the button below, or use the google popup if you see it.
             </span>
             <div>
                 <LoginButton />

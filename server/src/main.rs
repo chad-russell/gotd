@@ -12,14 +12,13 @@ use axum::{
     routing::{get, post},
     Json, Router, TypedHeader,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions, PgSslMode},
     PgPool,
 };
-use sudokugen::Sudoku;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use uuid::Uuid;
@@ -28,20 +27,187 @@ use std::{net::SocketAddr, time::Duration};
 
 const SECRET: &str = "secret";
 
-async fn sudoku_today() -> Json<Sudoku> {
-    // todo(chad): retrieve from database. If not found for today, then save it.
-    // Json(sudokugen::generate(sudokugen::Difficulty::Medium))
-    Json(Sudoku {
-        puzzle: "42897516337612894595136427881975362426784153953429681714258739678361945269543278-",
-        solution:
-            "428975163376128945951364278819753624267841539534296817142587396783619452695432781",
-        difficulty: sudokugen::Difficulty::Medium,
-    })
+fn midnight_today() -> NaiveDate {
+    let now = Utc::now()
+        .with_timezone(&chrono_tz::America::New_York)
+        .num_days_from_ce();
+    NaiveDate::from_num_days_from_ce_opt(now).unwrap()
 }
 
-async fn squareword_today() -> Json<String> {
-    // todo(chad): retrieve from database. If not found for today, then save it.
-    Json(squarewordgen::generate().to_string())
+#[derive(Serialize, sqlx::FromRow)]
+struct SudokuGame {
+    id: Uuid,
+    puzzle: String,
+    solution: String,
+    day: NaiveDate,
+    seconds: Option<i32>,
+}
+
+async fn sudoku_today(
+    State(pool): State<PgPool>,
+) -> Result<Json<SudokuGame>, (StatusCode, String)> {
+    let found_game: Option<SudokuGame> =
+        sqlx::query_as("select p.id, p.puzzle, p.solution, p.day, s.seconds from sudoku_puzzles p left join sudoku_scores s on s.puzzle_id=p.id where day = $1")
+            .bind(&midnight_today())
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed querying sudoku puzzle: {}", e.to_string()),
+                )
+            })?;
+
+    match found_game {
+        Some(found_game) => Ok(Json(found_game)),
+        None => {
+            // let generated = sudokugen::generate(sudokugen::Difficulty::Medium);
+            let generated = sudokugen::Sudoku {
+                puzzle: "42897516337612894595136427881975362426784153953429681714258739678361945269543278-",
+                solution: "428975163376128945951364278819753624267841539534296817142587396783619452695432781",
+                difficulty: sudokugen::Difficulty::Medium,
+            };
+
+            let new_id = Uuid::new_v4();
+
+            sqlx::query(
+                "insert into sudoku_puzzles (id, puzzle, solution, day) values ($1, $2, $3, $4)",
+            )
+            .bind(&new_id)
+            .bind(&generated.puzzle)
+            .bind(&generated.solution)
+            .bind(&midnight_today())
+            .execute(&pool)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed saving sudoku puzzle: {}", e.to_string()),
+                )
+            })?;
+
+            Ok(Json(SudokuGame {
+                id: new_id,
+                puzzle: generated.puzzle.to_string(),
+                solution: generated.solution.to_string(),
+                day: midnight_today(),
+                seconds: None,
+            }))
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct SaveSudokuScoreRequest {
+    puzzle_id: Uuid,
+    seconds: i32,
+}
+
+async fn save_sudoku_score(
+    user: User,
+    State(pool): State<PgPool>,
+    Json(request): Json<SaveSudokuScoreRequest>,
+) -> Result<(), (StatusCode, String)> {
+    sqlx::query(
+        "insert into sudoku_scores (id, user_id, puzzle_id, seconds) values ($1, $2, $3, $4)",
+    )
+    .bind(&Uuid::new_v4())
+    .bind(&user.id)
+    .bind(&request.puzzle_id)
+    .bind(&request.seconds)
+    .execute(&pool)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed saving sudoku score: {}", e.to_string()),
+        )
+    })?;
+
+    Ok(())
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+struct SquarewordGame {
+    id: Uuid,
+    solution: String,
+    day: NaiveDate,
+    guesses: Option<String>,
+}
+
+async fn squareword_today(
+    State(pool): State<PgPool>,
+) -> Result<Json<SquarewordGame>, (StatusCode, String)> {
+    let found_game: Option<SquarewordGame> =
+        sqlx::query_as("select p.id, p.solution, p.day, s.guesses from squareword_puzzles p left join squareword_scores s on s.puzzle_id=p.id where day = $1")
+            .bind(&midnight_today())
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Failed querying squareword puzzle: {}", e.to_string()),
+                )
+            })?;
+
+    match found_game {
+        Some(found_game) => Ok(Json(found_game)),
+        None => {
+            let generated = squarewordgen::generate();
+
+            let new_id = Uuid::new_v4();
+
+            sqlx::query("insert into squareword_puzzles (id, solution, day) values ($1, $2, $3)")
+                .bind(&new_id)
+                .bind(generated)
+                .bind(&midnight_today())
+                .execute(&pool)
+                .await
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Failed saving sudoku puzzle: {}", e.to_string()),
+                    )
+                })?;
+
+            Ok(Json(SquarewordGame {
+                id: new_id,
+                solution: generated.to_string(),
+                day: midnight_today(),
+                guesses: None,
+            }))
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct SaveSquarewordScoreRequest {
+    puzzle_id: Uuid,
+    guesses: String,
+}
+
+async fn save_squareword_score(
+    user: User,
+    State(pool): State<PgPool>,
+    Json(request): Json<SaveSquarewordScoreRequest>,
+) -> Result<(), (StatusCode, String)> {
+    sqlx::query(
+        "insert into squareword_scores (id, user_id, puzzle_id, guesses) values ($1, $2, $3, $4)",
+    )
+    .bind(&Uuid::new_v4())
+    .bind(&user.id)
+    .bind(&request.puzzle_id)
+    .bind(&request.guesses)
+    .execute(&pool)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed saving sudoku score: {}", e.to_string()),
+        )
+    })?;
+
+    Ok(())
 }
 
 #[derive(sqlx::FromRow, Serialize, Deserialize, Debug)]
@@ -91,8 +257,6 @@ async fn login(
     State(pool): State<PgPool>,
     Json(req): Json<LoginRequest>,
 ) -> Result<String, (StatusCode, String)> {
-    tracing::debug!("login token: {:?}", req.token);
-
     let header = jsonwebtoken::decode_header(&req.token).unwrap();
     let kid = match header.kid {
         Some(k) => k,
@@ -166,8 +330,6 @@ async fn login(
         }
     };
 
-    tracing::debug!("decoded token: {:?}", token);
-
     let token = jsonwebtoken::encode(
         &jsonwebtoken::Header::default(),
         &user,
@@ -207,8 +369,6 @@ where
                 .into_response()
         })?;
 
-        tracing::debug!("Decoded user: {:?}", token_user.claims);
-
         Ok(token_user.claims)
     }
 }
@@ -216,20 +376,6 @@ where
 async fn check_auth(user: User) -> Result<String, (StatusCode, String)> {
     Ok(format!("{:?}", user))
 }
-
-// async fn save_squareword(
-//     user: User,
-//     puzzle_id: Uuid,
-//     guesses: String,
-//     State(pool): State<PgPool>,
-// ) -> Result<(), (StatusCode, String)> {
-//     tracing::debug!("saving squareword: {} {} {}", user_id, puzzle_id, guesses);
-//     sqlx::query!("insert into squareword_scores (user_id, puzzle_id, guesses) values ($1, $2, $3)", user_id, puzzle_id, guesses)
-//         .execute(&pool)
-//         .await
-//         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
-//     Ok(())
-// }
 
 #[tokio::main]
 async fn main() {
@@ -259,7 +405,9 @@ async fn main() {
 
     let app = Router::new()
         .route("/sudoku/today", get(sudoku_today))
+        .route("/sudoku/score", post(save_sudoku_score))
         .route("/squareword/today", get(squareword_today))
+        .route("/squareword/score", post(save_squareword_score))
         .route("/login", post(login))
         .route("/check_auth", get(check_auth))
         .layer(CorsLayer::permissive())

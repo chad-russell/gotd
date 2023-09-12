@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use rand::{rngs::ThreadRng, Rng};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Serialize)]
 pub struct Sudoku {
@@ -253,7 +253,7 @@ const SEEDS: [Sudoku; 40] = [
     },
 ];
 
-#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Difficulty {
     Easy,

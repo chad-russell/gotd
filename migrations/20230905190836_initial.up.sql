@@ -4,7 +4,9 @@ create table if not exists "users" (
     "email" text not null,
     "picture" text not null,
     "created_at" timestamp with time zone not null,
-    "last_login" timestamp with time zone not null
+    "last_login" timestamp with time zone not null,
+
+    constraint "users_email_key" unique ("email")
 );
 
 create table if not exists "sudoku_puzzles" (
@@ -12,7 +14,8 @@ create table if not exists "sudoku_puzzles" (
     "puzzle" varchar(81) not null,
     "solution" varchar(81) not null,
     "day" date not null,
-    "difficulty" int not null
+
+    constraint "sudoku_puzzles_day_key" unique ("day")
 );
 
 create table if not exists "sudoku_scores" (
@@ -22,14 +25,17 @@ create table if not exists "sudoku_scores" (
     "seconds" int not null,
 
     foreign key ("user_id") references "users" ("id"),
-    foreign key ("puzzle_id") references "sudoku_puzzles" ("id")
+    foreign key ("puzzle_id") references "sudoku_puzzles" ("id"),
+
+    constraint "sudoku_scores_user_id_puzzle_id_key" unique ("user_id", "puzzle_id")
 );
 
 create table if not exists "squareword_puzzles" (
     "id" uuid primary key,
-    "puzzle" varchar(25) not null,
     "solution" varchar(25) not null,
-    "day" date not null
+    "day" date not null,
+
+    constraint "squareword_puzzles_day_key" unique ("day")
 );
 
 create table if not exists "squareword_scores" (
@@ -39,5 +45,7 @@ create table if not exists "squareword_scores" (
     "guesses" text not null,
 
     foreign key ("user_id") references "users" ("id"),
-    foreign key ("puzzle_id") references "squareword_puzzles" ("id")
+    foreign key ("puzzle_id") references "squareword_puzzles" ("id"),
+
+    constraint "squareword_scores_user_id_puzzle_id_key" unique ("user_id", "puzzle_id")
 );
