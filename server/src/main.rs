@@ -153,7 +153,8 @@ async fn squareword_today(
     match found_game {
         Some(found_game) => Ok(Json(found_game)),
         None => {
-            let generated = squarewordgen::generate();
+            // let generated = squarewordgen::generate();
+            let generated = "swapspilotarosedenseedged";
 
             let new_id = Uuid::new_v4();
 

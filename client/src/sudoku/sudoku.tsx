@@ -6,6 +6,7 @@ import { BsPatchQuestionFill, BsPauseCircle, BsPlayCircle } from 'solid-icons/bs
 import { BsPencil } from 'solid-icons/bs'
 import { daysEqual, getDay } from '../util';
 import { setToken, token } from '../auth/auth';
+import * as state from './state';
 
 // const puzzle = {
 //     puzzle: "--89---6---6-2--45951----7----7-3----6-8---3---4--6-1---2---39-78-6---526-5-3----",
@@ -19,167 +20,48 @@ import { setToken, token } from '../auth/auth';
 //     difficulty: "medium",
 // };
 
-const [inputStyle, setInputStyle] = createSignal<'number' | 'note'>('number');
 const [noErrAnim, setNoErrAnim] = createSignal(false);
 const [winnerColorChange, setWinnerColorChange] = createSignal(0);
-const [puzzleDay, setPuzzleDay] = createSignal<Date | null>(null);
-const [solution, setSolution] = createSignal<string | null>(null);
-const [loading, setLoading] = createSignal(false);
-const [id, setId] = createSignal<string | null>(null);
-
-const [winner, setWinner] = createSignal(false);
-function win() {
-    setWinner(true);
-    setPaused(true);
-    setWinnerColorChange(0);
-    setTimeout(updateWinnerColorChange, 500);
-}
 
 function isCorrectDay() {
-    return daysEqual(puzzleDay(), getDay());
+    return daysEqual(state.puzzleDay(), getDay());
 }
 
 function updateWinnerColorChange() {
     setWinnerColorChange(winnerColorChange() + 1);
-    if (winner()) {
+    if (state.winner()) {
         setTimeout(updateWinnerColorChange, 500);
     }
 }
 
-const [seconds, setSeconds] = createSignal(0);
-setInterval(() => {
-    if (!paused()) {
-        setSeconds(s => s + 1);
-    }
-}, 1000);
-
-const [paused, setPaused] = createSignal(false);
-
-const [history, setHistory] = createSignal<History | null>(null, { equals: false });
-
 function swapInputStyle() {
-    if (inputStyle() === 'number') {
-        setInputStyle('note');
+    if (state.inputStyle() === 'number') {
+        state.setInputStyle('note');
     } else {
-        setInputStyle('number');
+        state.setInputStyle('number');
     }
 }
-
-type CellState = {
-    value: number | null,
-    isGiven: boolean,
-    check: boolean | null,
-    notes: number[],
-};
-
-type GameState = {
-    selectedCell: number | null,
-    cells: CellState[],
-};
-
-type History = GameState[];
 
 async function saveHistory() {
     // If local storage is for a different day, clear it and load from server
     if (!isCorrectDay()) {
         localStorage.removeItem('sudoku');
-        await loadGameFromServer();
+        await state.loadGameFromServer();
     }
 
-    localStorage.setItem('sudoku', JSON.stringify({
-        'id': id(),
-        'paused': paused(),
-        'seconds': seconds(),
-        'inputStyle': inputStyle(),
-        'history': history(),
-        'puzzleDay': puzzleDay(),
-        'solution': solution(),
-    }));
+    state.saveLocal();
 }
 
-async function loadHistory() {
-    // Look in history first
-    const fromStorage = localStorage.getItem('sudoku');
-
-    if (fromStorage !== null) {
-        let { id, puzzleDay, seconds, paused, history, solution } = JSON.parse(fromStorage);
-        puzzleDay = new Date(puzzleDay);
-
-        // If the save is from today, we can use it
-        if (daysEqual(puzzleDay, getDay())) {
-            setId(id);
-            setSeconds(seconds);
-            setPaused(paused);
-            setHistory(history);
-            setPuzzleDay(puzzleDay);
-            setSolution(solution);
-
-            return;
-        }
+function curGameState(): state.GameState {
+    let h = state.history();
+    if (!h) {
+        throw 'ERROR: "history" not defined';
     }
-
-    await loadGameFromServer();
-}
-
-async function loadGameFromServer() {
-    if (loading()) {
-        return;
-    }
-    setLoading(true);
-
-    // read from the `/sudoku/today` endpoint of the server
-    let res = await fetch('http://localhost:3001/sudoku/today');
-    let p = await res.json();
-
-    const cells: CellState[] = p.puzzle.split('').map((c: string) => {
-        if (c === '-') {
-            return {
-                value: null,
-                isGiven: false,
-                notes: [],
-                check: null,
-            };
-        }
-
-        return {
-            value: parseInt(c),
-            isGiven: true,
-            notes: [],
-            check: null,
-        };
-    });
-
-    setHistory([{
-        selectedCell: null,
-        cells,
-    }]);
-
-    setSolution(p.solution);
-
-    setId(p.id);
-
-    setSeconds(0);
-
-    if (p.seconds != null) {
-        setSeconds(p.seconds);
-        win();
-    }
-
-    let [y, m, d] = p.day.split('-');
-    let date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-    setPuzzleDay(date);
-
-    setLoading(false);
-}
-
-function curGameState(): GameState {
-    let h = history();
-    if (!h) { return h; }
 
     return h[h.length - 1];
 }
 
-function updateSelectedCell(fn: (_: CellState) => void) {
+function updateSelectedCell(fn: (_: state.CellState) => void) {
     const gs = curGameState();
 
     if (gs.selectedCell === null) {
@@ -193,7 +75,7 @@ function updateSelectedCell(fn: (_: CellState) => void) {
 
     fn(newCells[gs.selectedCell]);
 
-    setHistory(h => [...h!, { ...gs, cells: newCells }]);
+    state.setHistory(h => [...h!, { ...gs, cells: newCells }]);
 }
 
 function selectedNumber() {
@@ -213,7 +95,7 @@ function inputNumber(n: number) {
         return;
     }
 
-    if (inputStyle() === 'note') {
+    if (state.inputStyle() === 'note') {
         updateSelectedCell(sc => {
             if (sc.value !== null) {
                 return;
@@ -263,7 +145,7 @@ function inputNumber(n: number) {
             }
         }
 
-        setHistory(h => {
+        state.setHistory(h => {
             if (!h) { return h; };
             return [...h];
         });
@@ -274,7 +156,7 @@ function clearChecks() {
     for (let i = 0; i < 81; i++) {
         curGameState().cells[i].check = null;
     }
-    setHistory(h => {
+    state.setHistory(h => {
         if (!h) { return h; }
         return [...h];
     });
@@ -299,7 +181,7 @@ function clearCell() {
 }
 
 function checkCell(n: number) {
-    const sol = solution();
+    const sol = state.solution();
     if (!sol) { return; }
 
     const gs = curGameState();
@@ -329,14 +211,14 @@ function checkCells() {
     for (let i = 0; i < 81; i++) {
         checkCell(i);
     }
-    setHistory(h => {
+    state.setHistory(h => {
         if (!h) { return h; }
         return [...h];
     });
 }
 
 function setSelectedCell(n: number) {
-    setHistory(h => {
+    state.setHistory(h => {
         if (!h) { return h; }
 
         h[h.length - 1].selectedCell = n;
@@ -345,18 +227,18 @@ function setSelectedCell(n: number) {
 }
 
 function undo() {
-    if (winner()) {
+    if (state.winner()) {
         return;
     }
 
-    const h = history();
+    const h = state.history();
     if (!h) { return; }
 
     if (h.length === 1) {
         return;
     }
 
-    setHistory(h.slice(0, h.length - 1));
+    state.setHistory(h.slice(0, h.length - 1));
 }
 
 function allFilled(n: number | null) {
@@ -420,19 +302,17 @@ const SudokuCell: Component<{ n: number }> = (props) => {
     }
 
     function bgStyle() {
-        if (winner()) {
+        if (state.winner()) {
             // subscribe to changes in winnerColorChange
             winnerColorChange();
 
-            const _tailwindHack = 'bg-red-400 bg-orange-400 bg-yellow-400 bg-green-400 bg-blue-400 bg-purple-400 bg-pink-400';
-
-            let tailwindColorsList = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink'];
+            let tailwindColorsList = ['bg-red-400', 'bg-orange-400', 'bg-yellow-400', 'bg-green-400', 'bg-blue-400', 'bg-purple-400', 'bg-pink-400'];
             let randomIndex = Math.floor(Math.random() * tailwindColorsList.length);
             let randomTailwindColor = tailwindColorsList[randomIndex];
-            return `bg-${randomTailwindColor}-400 transition linear duration-500`;
+            return `${randomTailwindColor} transition linear duration-500`;
         }
 
-        if (paused()) {
+        if (state.paused()) {
             return 'bg-white';
         }
 
@@ -488,7 +368,7 @@ const SudokuCell: Component<{ n: number }> = (props) => {
     }
 
     function textStyle() {
-        if (paused()) {
+        if (state.paused()) {
             return 'text-slate-600';
         }
 
@@ -545,10 +425,11 @@ const SudokuCell: Component<{ n: number }> = (props) => {
     }
 
     function value() {
-        if (paused()) {
-            if (winner()) {
-                return '🎉';
-            }
+        if (state.winner()) {
+            return '🎉';
+        }
+
+        if (state.paused()) {
             return '?';
         }
 
@@ -562,7 +443,7 @@ const SudokuCell: Component<{ n: number }> = (props) => {
                 setSelectedCell(props.n);
             }}
         >
-            <Show when={hasValue() || paused()} fallback={<Notes n={props.n} />}>
+            <Show when={hasValue() || state.paused()} fallback={<Notes n={props.n} />}>
                 <span style='font-size: min(4vh, 8vw)' class={`z-10 select-none ${textStyle()} transition ease-in-out duration-100`}>
                     {value()}
                 </span>
@@ -598,7 +479,7 @@ const Sudoku3x3: Component<{ n: number, border: string[] }> = (props) => {
 
 const SudokuInputNumber: Component<{ n: number }> = (props) => {
     function style(): string {
-        if (allFilled(props.n)) {
+        if (state.winner() || allFilled(props.n)) {
             return 'text-gray-400 lg:py-5';
         }
 
@@ -607,7 +488,7 @@ const SudokuInputNumber: Component<{ n: number }> = (props) => {
 
     return (
         <button
-            disabled={allFilled(props.n)}
+            disabled={state.winner() || allFilled(props.n)}
             style='font-size: min(4vh, 8vw)'
             class={`text-center flex flex-col items-center justify-center m-1 rounded-xl select-none ${style()}`}
             onClick={() => inputNumber(props.n)}
@@ -651,7 +532,7 @@ const SudokuBoard: Component = () => {
 
 const InputStyle: Component = () => {
     function transform(style: 'number' | 'note') {
-        if (inputStyle() == style) {
+        if (state.inputStyle() == style) {
             return '';
         }
 
@@ -660,7 +541,7 @@ const InputStyle: Component = () => {
 
     return (
         <div
-            class='col-span-1 flex flex-col items-center justify-center border text-stone-700 bg-white border-stone-800 rounded-md py-1 m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
+            class='col-span-1 flex flex-col items-center justify-center border text-slate-700 bg-white border-stone-800 rounded-md py-1 m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
             onClick={() => swapInputStyle()}
         >
             <button
@@ -686,8 +567,8 @@ const SudokuIcons: Component = () => {
         <div class='grid grid-cols-4 lg:ml-6 select-none'>
             <button
                 style='font-size: min(2.5vh, 5vw)'
-                class='flex flex-col justify-end items-center border border-stone-800 text-stone-700 bg-white rounded-md py-1 m-1 hover:bg-none sm:hover:bg-red-100 active:bg-red-200 sm:active:bg-red-200'
-                disabled={paused() || history()?.length === 1}
+                class='flex flex-col justify-end items-center border border-stone-800 text-slate-700 bg-white rounded-md py-1 m-1 hover:bg-none sm:hover:bg-red-100 active:bg-red-200 sm:active:bg-red-200'
+                disabled={state.winner() || state.paused() || state.history()?.length === 1}
                 onClick={() => undo()}
             >
                 <IoArrowUndoOutline color="rgb(47, 41, 36)" />
@@ -695,8 +576,8 @@ const SudokuIcons: Component = () => {
             </button>
             <button
                 style='font-size: min(2.5vh, 5vw)'
-                class='flex flex-col justify-end items-center border text-stone-700 bg-white border-stone-800 rounded-md py-1 m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
-                disabled={paused()}
+                class='flex flex-col justify-end items-center border text-slate-700 bg-white border-stone-800 rounded-md py-1 m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
+                disabled={state.winner() || state.paused()}
                 onClick={() => clearCell()}
             >
                 <FiDelete color="rgb(47, 41, 36)" />
@@ -704,8 +585,8 @@ const SudokuIcons: Component = () => {
             </button>
             <InputStyle />
             <button
-                disabled={noErrAnim() || paused()}
-                style='font-size: min(2.5vh, 5vw)' class='flex flex-col justify-end items-center border text-stone-700 bg-white border-stone-800 rounded-md py-1 m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
+                disabled={state.winner() || noErrAnim() || state.paused()}
+                style='font-size: min(2.5vh, 5vw)' class='flex flex-col justify-end items-center border text-slate-700 bg-white border-stone-800 rounded-md py-1 m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
                 onClick={() => checkCells()}
             >
                 <BsPatchQuestionFill color="rgb(47, 41, 36)" />
@@ -722,21 +603,33 @@ const Timer: Component = () => {
         return `${minutes}:${secondsLeft.toString().padStart(2, '0')} `;
     }
 
+    function time() {
+        if (state.winner()) {
+            return 'Final Time:';
+        }
+
+        return 'Time:';
+    }
+
     return (
         <div class='flex flex-row items-center justify-center'>
             <div
-                class='flex flex-row items-center py-1 px-4 my-1 text-lg md:text-xl lg:text-2xl text-center text-blue-600 bg-white border border-stone-800 rounded-md'
+                class='flex flex-row items-center py-1 px-4 my-1 text-lg md:text-xl lg:text-2xl text-center text-blue-600 bg-white border border-stone-800 rounded-md shadow-lg'
                 onClick={() => {
-                    if (winner()) { return; }
-                    setPaused(!paused());
+                    if (state.winner()) { return; }
+                    state.setPaused(!state.paused());
                 }}
             >
-                <span class='mr-3 select-none'>Time: {formatTime(seconds())}</span>
-                <Show when={paused() && !winner()}>
-                    <BsPlayCircle font-size='22' color="rgb(37, 99, 235)" />
+                <span class='select-none'>{time()} {formatTime(state.seconds())}</span>
+                <Show when={state.paused() && !state.winner()}>
+                    <div class='ml-3'>
+                        <BsPlayCircle font-size='22' color="rgb(37, 99, 235)" />
+                    </div>
                 </Show>
-                <Show when={!paused()}>
-                    <BsPauseCircle font-size='22' color="rgb(37, 99, 235)" />
+                <Show when={!state.winner() && !state.paused()}>
+                    <div class='ml-3'>
+                        <BsPauseCircle font-size='22' color="rgb(37, 99, 235)" />
+                    </div>
                 </Show>
             </div>
         </div>
@@ -751,8 +644,8 @@ async function saveScore() {
             'Authorization': `Bearer ${token()}`,
         },
         body: JSON.stringify({
-            puzzle_id: id(),
-            seconds: seconds(),
+            puzzle_id: state.id(),
+            seconds: state.seconds(),
         }),
     });
 
@@ -769,37 +662,53 @@ async function saveScore() {
 
 export const Sudoku: Component = () => {
     onMount(() => {
-        loadHistory();
+        setInterval(() => {
+            if (!state.winner() && !state.paused()) {
+                state.setSeconds(s => s + 1);
+            }
+        }, 1000);
+
+        state.loadHistory();
 
         createEffect(() => {
             saveHistory();
         });
 
         createEffect(() => {
+            if (state.winner()) {
+                setWinnerColorChange(0);
+                setTimeout(updateWinnerColorChange, 500);
+            }
+        });
+
+        createEffect(() => {
+            if (!state.history()) {
+                return;
+            }
+
             const gs = curGameState();
-            const sol = solution();
+            const sol = state.solution();
 
             if (!gs || !sol) { return; }
 
             if (gs.cells.every((c) => c.value !== null)) {
                 for (let i = 0; i < 81; i++) {
                     if (gs.cells[i].value?.toString() !== sol[i]) {
-                        console.log('wincheck 4');
                         return;
                     }
                 }
 
-                console.log('YOU WIN!!!!');
-                win();
-                saveScore();
-            } else {
-                setWinner(false);
+                if (!state.winner()) {
+                    console.log('YOU WIN!!!!');
+                    state.setWinner(true);
+                    saveScore();
+                }
             }
         });
 
         window.addEventListener('keydown', (e) => {
             const gs = curGameState();
-            if (gs?.selectedCell === null) {
+            if (gs.selectedCell === null) {
                 return;
             }
 
@@ -875,7 +784,7 @@ export const Sudoku: Component = () => {
     });
 
     return (
-        <Show when={id() != null && history() !== null && !loading()} fallback={<div>Loading...</div>}>
+        <Show when={state.id() != null && state.history() !== null && !state.loading()} fallback={<div>Loading...</div>}>
             <div class='h-[90vh] flex flex-col justify-between items-center lg:flex-row lg:justify-center m-1'>
                 <div class='flex flex-col max-h-[50vh] max-w-[50vh] w-full lg:max-h-[75vh] lg:max-w-[75vh]'>
                     <Timer />

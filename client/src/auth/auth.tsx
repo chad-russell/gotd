@@ -1,4 +1,6 @@
-import { Component, createEffect, createSignal, onMount } from "solid-js";
+import { Component, createSignal, onMount } from "solid-js";
+import * as squarewordState from "../squareword/state";
+import * as sudokuState from "../sudoku/state";
 
 export const [token, setToken] = createSignal<string | null>(null);
 
@@ -10,9 +12,6 @@ const LoginButton: Component = () => {
     const btn = <div id="buttonDiv"></div>;
 
     async function handleCredentialResponse(response: { credential: any; }) {
-        // send response.credential to backend for validation
-        // if valid, setToken(response.credential)
-        // else, show error message
         const res = await fetch('http://localhost:3001/login', {
             method: 'POST',
             headers: {
@@ -29,6 +28,9 @@ const LoginButton: Component = () => {
         }
 
         setToken(text);
+
+        squarewordState.loadHistory();
+        sudokuState.loadHistory();
     }
 
     onMount(() => {

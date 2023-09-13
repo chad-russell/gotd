@@ -5,52 +5,50 @@ import { DICTIONARY } from './dictionary';
 import { daysEqual, getDay } from '../util';
 import { Portal } from 'solid-js/web';
 import { setToken, token } from '../auth/auth';
-
-const [solution, setSolution] = createSignal<Array<string> | null>(null);
-const [puzzleDay, setPuzzleDay] = createSignal<Date | null>(null);
-const [id, setId] = createSignal<string | null>(null);
-const [loading, setLoading] = createSignal(false);
-
-const [guess, setGuess] = createSignal<Array<string>>([]);
-
-const [guessHistory, setGuessHistory] = createSignal<Array<string>>([]);
+import * as state from './state';
 
 const [showGuess, setShowGuess] = createSignal<boolean>(false);
 
+const [guessError, setGuessError] = createSignal<boolean>(false);
+
 const [guessLock, setGuessLock] = createSignal<boolean>(false);
+
 const [animatedRow1, setAnimatedRow1] = createSignal<boolean>(false);
 const [animatedRow2, setAnimatedRow2] = createSignal<boolean>(false);
 const [animatedRow3, setAnimatedRow3] = createSignal<boolean>(false);
 const [animatedRow4, setAnimatedRow4] = createSignal<boolean>(false);
 const [animatedRow5, setAnimatedRow5] = createSignal<boolean>(false);
 
-const [guessError, setGuessError] = createSignal<boolean>(false);
+export async function saveScore() {
+    const res = await fetch('http://localhost:3001/squareword/score', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token()}`,
+        },
+        body: JSON.stringify({
+            puzzle_id: state.id(),
+            guesses: state.guessHistory().join(''),
+        }),
+    });
 
-const [winner, setWinner] = createSignal(false);
-
-function isCorrectDay() {
-    return daysEqual(puzzleDay(), getDay());
-}
-
-async function saveHistory() {
-    // If local storage is for a different day, clear it and load from server
-    if (!isCorrectDay()) {
-        localStorage.removeItem('squareword');
-        await loadGameFromServer();
+    if (res.status === 401) {
+        setToken(null);
+        return;
     }
 
-    localStorage.setItem('squareword', JSON.stringify({
-        'id': id(),
-        'solution': solution(),
-        'guess': guess(),
-        'guessHistory': guessHistory(),
-        'puzzleDay': puzzleDay(),
-        'winner': winner(),
-    }));
+    else if (res.status !== 200) {
+        console.log('Error saving score');
+        return;
+    }
+}
+
+function isCorrectDay() {
+    return daysEqual(state.puzzleDay(), getDay());
 }
 
 function correctLetter(row: number, col: number) {
-    return solution()![row - 1][col];
+    return state.solution()![row - 1][col];
 }
 
 function animatingRow(row: number): boolean {
@@ -87,7 +85,7 @@ function animatingRowOrBelow(row: number): boolean {
 }
 
 function alreadyGuessedCorrectSolution(row: number, col: number): boolean {
-    if (guessHistory().length < 1) {
+    if (state.guessHistory().length < 1) {
         return false;
     }
 
@@ -96,7 +94,7 @@ function alreadyGuessedCorrectSolution(row: number, col: number): boolean {
         toSub = 0;
     }
 
-    for (let guess of guessHistory().slice(0, guessHistory().length - toSub)) {
+    for (let guess of state.guessHistory().slice(0, state.guessHistory().length - toSub)) {
         if (guess[col] == correctLetter(row, col)) {
             return true;
         }
@@ -114,7 +112,7 @@ function winnerRow(row: number, col: number): boolean {
         return false;
     }
 
-    for (let guess of guessHistory()) {
+    for (let guess of state.guessHistory()) {
         if (guess[col] == correctLetter(row, col)) {
             return true;
         }
@@ -127,100 +125,21 @@ function winnerRow(row: number, col: number): boolean {
     return false;
 }
 
-async function loadHistory() {
-    const fromStorage = localStorage.getItem('squareword');
-
-    if (fromStorage) {
-        let { id, puzzleDay, solution, guess, guessHistory, winner } = JSON.parse(fromStorage);
-
-        puzzleDay = new Date(puzzleDay);
-
-        // If the save is from today, we can use it
-        if (daysEqual(puzzleDay, getDay())) {
-            setWinner(winner);
-            setId(id);
-            setSolution(solution);
-            setGuess(guess);
-            setGuessHistory(guessHistory);
-            setPuzzleDay(puzzleDay);
-
-            return;
-        }
+async function saveHistory() {
+    // If local storage is for a different day, clear it and load from server
+    if (!isCorrectDay()) {
+        localStorage.removeItem('squareword');
+        await state.loadGameFromServer();
     }
-
-    await loadGameFromServer();
-}
-
-async function loadGameFromServer() {
-    if (loading()) {
-        return;
-    }
-    setLoading(true);
-
-    // read from the `/squareword/today` endpoint of the server
-    const res = await fetch('http://localhost:3001/squareword/today');
-    const resJson = await res.json();
-
-    const sol = resJson.solution;
-
-    setId(resJson.id);
-
-    let [y, m, d] = resJson.day.split('-');
-    let date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
-    setPuzzleDay(new Date(date));
-
-    if (resJson.guesses != null) {
-        let guesses = [];
-        while (resJson.guesses.length > 0) {
-            guesses.push(resJson.guesses.slice(0, 5));
-            resJson.guesses = resJson.guesses.slice(5);
-        }
-        setWinner(true);
-        setGuessHistory(guesses);
-    }
-
-    setSolution([
-        sol.slice(0, 5),
-        sol.slice(5, 10),
-        sol.slice(10, 15),
-        sol.slice(15, 20),
-        sol.slice(20, 25),
-    ]);
 
     localStorage.setItem('squareword', JSON.stringify({
-        'id': id(),
-        'solution': solution(),
-        'guess': [],
-        'guessHistory': guessHistory(),
-        'puzzleDay': puzzleDay(),
-        'winner': winner(),
+        'id': state.id(),
+        'solution': state.solution(),
+        'guess': state.guess(),
+        'guessHistory': state.guessHistory(),
+        'puzzleDay': state.puzzleDay(),
+        'winner': state.winner(),
     }));
-
-    setLoading(false);
-}
-
-async function saveScore() {
-    const res = await fetch('http://localhost:3001/squareword/score', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token()}`,
-        },
-        body: JSON.stringify({
-            puzzle_id: id(),
-            guesses: guessHistory().join(''),
-        }),
-    });
-
-    if (res.status === 401) {
-        setToken(null);
-        return;
-    }
-
-    else if (res.status !== 200) {
-        console.log('Error saving score');
-        return;
-    }
 }
 
 function notifyGuessError() {
@@ -236,18 +155,18 @@ function notifyGuessError() {
 }
 
 function enterGuess() {
-    if (guess().length != 5) {
+    if (state.guess().length != 5) {
         return;
     }
 
-    for (let g of guessHistory()) {
-        if (g == guess().join('')) {
+    for (let g of state.guessHistory()) {
+        if (g == state.guess().join('')) {
             notifyGuessError();
             return;
         }
     }
 
-    if (!DICTIONARY.includes(guess().join(''))) {
+    if (!DICTIONARY.includes(state.guess().join(''))) {
         notifyGuessError();
         return;
     }
@@ -256,7 +175,7 @@ function enterGuess() {
         return;
     }
 
-    setGuessHistory([...guessHistory(), guess().join('')]);
+    state.setGuessHistory([...state.guessHistory(), state.guess().join('')]);
 
     setGuessLock(true);
     setTimeout(() => {
@@ -265,7 +184,7 @@ function enterGuess() {
 
     setAnimatedRow1(true);
     setTimeout(() => {
-        setGuess([]);
+        state.setGuess([]);
         setAnimatedRow1(false);
     }, 201);
 
@@ -371,7 +290,7 @@ const KeyboardLetter: Component<{ letter: string }> = (props) => {
 
         // If the letter has been guessed at all and we haven't already returned yellow,
         // then it's correct so return green
-        for (let guess of guessHistory()) {
+        for (let guess of state.guessHistory()) {
             if (guess.includes(props.letter.toLowerCase())) {
                 return 'bg-green-200';
             }
@@ -385,17 +304,17 @@ const KeyboardLetter: Component<{ letter: string }> = (props) => {
         class={`py-1 px-2 md:px-3 mx-[1px] md:mx-[2px] border border-stone-800 rounded-md select-none ${colorClasses()}`}
         onClick={() => {
             if (props.letter == 'DEL') {
-                if (guess().length > 0) {
-                    guess().pop();
-                    setGuess([...guess()]);
+                if (state.guess().length > 0) {
+                    state.guess().pop();
+                    state.setGuess([...state.guess()]);
                 }
             }
             else if (props.letter == 'ENT') {
                 enterGuess();
             }
             else {
-                guess().push(props.letter);
-                setGuess([...guess()]);
+                state.guess().push(props.letter);
+                state.setGuess([...state.guess()]);
             }
         }}
     >
@@ -405,11 +324,11 @@ const KeyboardLetter: Component<{ letter: string }> = (props) => {
 
 const GuessTile: Component<{ index: number }> = (props) => {
     function letter() {
-        if (guess().length <= props.index) {
+        if (state.guess().length <= props.index) {
             return null;
         }
 
-        return guess()[props.index].toUpperCase();
+        return state.guess()[props.index].toUpperCase();
     }
 
     function divAnimatedStyle() {
@@ -452,8 +371,8 @@ const ViewGuessTile: Component = () => {
     function value() {
         return (
             <div class='flex flex-col items-center justify-center'>
-                <span class='text-xl'>{guessHistory().length}</span>
-                <span class='text-xs md:text-xl'>{pluralize(guessHistory().length, 'Guess')}</span>
+                <span class='text-xl'>{state.guessHistory().length}</span>
+                <span class='text-xs md:text-xl'>{pluralize(state.guessHistory().length, 'Guess')}</span>
             </div>
         );
     }
@@ -466,7 +385,7 @@ const ViewGuessTile: Component = () => {
 };
 
 const SolutionTile: Component<{ col: number, row: number }> = (props) => {
-    if (!solution()) {
+    if (!state.solution()) {
         return <div />;
     }
 
@@ -479,7 +398,7 @@ const SolutionTile: Component<{ col: number, row: number }> = (props) => {
             return '';
         }
 
-        for (let guess of guessHistory()) {
+        for (let guess of state.guessHistory()) {
             if (guess[props.col] == correctLetter(props.row, props.col)) {
                 return correctLetter(props.row, props.col).toUpperCase();
             }
@@ -513,7 +432,7 @@ const SolutionTile: Component<{ col: number, row: number }> = (props) => {
             return '';
         }
 
-        for (let guess of guessHistory()) {
+        for (let guess of state.guessHistory()) {
             if (guess[props.col] == correctLetter(props.row, props.col)) {
                 if (animatingRow(props.row)) {
                     return 'animate-wowFadeIn bg-green-500';
@@ -531,7 +450,7 @@ const SolutionTile: Component<{ col: number, row: number }> = (props) => {
     }
 
     function value() {
-        if (winner()) {
+        if (state.winner()) {
             return '🎉';
         }
         else {
@@ -549,8 +468,8 @@ const SolutionTile: Component<{ col: number, row: number }> = (props) => {
 function misplacedLetters(row: number): Array<string> {
     const ml = new Set<string>();
 
-    const a = solution();
-    const gLen = guessHistory().length;
+    const a = state.solution();
+    const gLen = state.guessHistory().length;
 
     if (!a || gLen == 0) {
         return [];
@@ -558,7 +477,7 @@ function misplacedLetters(row: number): Array<string> {
 
     const ans = a[row - 1];
 
-    const consideredGuesses = guessHistory();
+    const consideredGuesses = state.guessHistory();
 
     for (let ai = 0; ai < 5; ai++) {
         // Did we guess it at all?
@@ -592,7 +511,7 @@ function misplacedLetters(row: number): Array<string> {
 
 const MisplacedLettersTile: Component<{ row: number }> = (props) => {
     function value() {
-        if (winner()) {
+        if (state.winner()) {
             return '🎉';
         }
         else {
@@ -601,7 +520,7 @@ const MisplacedLettersTile: Component<{ row: number }> = (props) => {
     }
 
     function fontSize() {
-        if (winner()) {
+        if (state.winner()) {
             return 'min(6vw, 5vh)';
         }
         else {
@@ -618,11 +537,11 @@ const MisplacedLettersTile: Component<{ row: number }> = (props) => {
 
 const SquarewordBoard: Component = () => {
     function guessRow() {
-        if (winner()) {
+        if (state.winner()) {
             return (
                 <div class='col-span-6 flex flex-row items-center justify-center text-3xl md:text-4xl lg:text-5xl text-slate-700 select-none'>
                     <span>WINNER!!</span>
-                    <span class='ml-3 text-blue-700' onClick={() => setShowGuess(true)}>{`(${guessHistory().length}) Guesses`}</span>
+                    <span class='ml-3 text-blue-700' onClick={() => setShowGuess(true)}>{`(${state.guessHistory().length}) Guesses`}</span>
                 </div>
             );
         }
@@ -690,12 +609,12 @@ const SquarewordBoard: Component = () => {
 const GuessModal = () => {
     return (
         <div
-            class='fixed inset-x-0 inset-y-0 flex flex-col justify-center items-center bg-black bg-opacity-50'
+            class='fixed inset-x-0 inset-y-0 flex flex-col justify-center items-center bg-stone-800 bg-opacity-50'
             onClick={() => setShowGuess(false)}
         >
             <div class='w-1/2 max-w-[200px] h-1/2 py-2 bg-blue-300 p-30 flex flex-col items-center justify-center rounded-md' onClick={(e) => { e.stopPropagation() }}>
                 <div class='overflow-scroll w-full flex flex-col items-center'>
-                    <For each={guessHistory()}>
+                    <For each={state.guessHistory()}>
                         {(guess) => <div class='text-2xl my-2'>{guess.toUpperCase()}</div>}
                     </For>
                 </div>
@@ -706,15 +625,15 @@ const GuessModal = () => {
 
 export const Squareword: Component = () => {
     onMount(() => {
-        loadHistory();
+        state.loadHistory();
 
         createEffect(() => {
             saveHistory();
         });
 
         createEffect(() => {
-            const a = solution();
-            const gs = guessHistory();
+            const a = state.solution();
+            const gs = state.guessHistory();
 
             if (!a) {
                 return;
@@ -732,11 +651,11 @@ export const Squareword: Component = () => {
                 }
             }
 
-            if (winner()) {
+            if (state.winner()) {
                 return;
             }
 
-            setWinner(true);
+            state.setWinner(true);
             saveScore();
         });
     });
@@ -748,17 +667,17 @@ export const Squareword: Component = () => {
         }
 
         if (e.key >= 'a' && e.key <= 'z') {
-            if (guess().length < 5) {
-                guess().push(e.key);
-                setGuess([...guess()]);
+            if (state.guess().length < 5) {
+                state.guess().push(e.key);
+                state.setGuess([...state.guess()]);
             }
         }
         switch (e.key) {
             case 'Backspace':
             case 'Delete':
-                if (guess().length > 0) {
-                    guess().pop();
-                    setGuess([...guess()]);
+                if (state.guess().length > 0) {
+                    state.guess().pop();
+                    state.setGuess([...state.guess()]);
                 }
                 return null;
             case 'Enter':
@@ -769,7 +688,7 @@ export const Squareword: Component = () => {
     });
 
     return (
-        <Show when={id() && !loading()} fallback={<div>Loading...</div>}>
+        <Show when={state.id() && !state.loading()} fallback={<div>Loading...</div>}>
             <div class='h-[90vh] flex flex-col justify-center items-center m-1'>
                 <div class='flex flex-col max-h-[90vh] max-w-[60vh] w-full'>
                     <SquarewordBoard />

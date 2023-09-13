@@ -15,3 +15,11 @@ export function daysEqual(d1: Date | null, d2: Date | null): boolean {
 
     return dateAtMidnight(d1).getTime() === dateAtMidnight(d2).getTime();
 }
+
+export const breakpoints = {
+    sm: "640px",
+    md: "768px",
+    lg: "1024px",
+};
+
+
