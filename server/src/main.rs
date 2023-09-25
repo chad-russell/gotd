@@ -13,6 +13,7 @@ use axum::{
     Json, Router, TypedHeader,
 };
 use chrono::{DateTime, Datelike, NaiveDate, Utc};
+use clap::Parser;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use sqlx::{
@@ -377,8 +378,17 @@ async fn check_auth(user: User) -> Result<String, (StatusCode, String)> {
     Ok(format!("{:?}", user))
 }
 
+#[derive(Parser, Debug)]
+struct Args {
+    /// DB Hostname
+    #[arg(short, long, default_value = "localhost")]
+    db_host: String,
+}
+
 #[tokio::main]
 async fn main() {
+    let args = Args::parse();
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -394,7 +404,7 @@ async fn main() {
             PgConnectOptions::new()
                 .username("admin")
                 .password("pgpass")
-                .host("homelab")
+                .host(&args.db_host)
                 .port(5432)
                 .database("gotd"),
         )
