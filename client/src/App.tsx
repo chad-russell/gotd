@@ -5,8 +5,9 @@ import { LoginScreen, loggedIn, token, setToken } from './auth/auth';
 import { Squareword } from './squareword/squareword';
 import * as squarewordState from './squareword/state';
 import * as sudokuState from './sudoku/state';
-import { createBreakpoints } from "@solid-primitives/media";
 import { breakpoints } from './util';
+import { createBreakpoints } from "@solid-primitives/media";
+import { TopBar } from './common/topBar';
 
 const matches = createBreakpoints(breakpoints);
 
@@ -23,22 +24,26 @@ function day(): string {
 }
 
 const SudokuHome: Component = () => {
+    // <h2 class='text-3xl md:text-4xl lg:text-5xl lg:pt-10 text-center my-2 h-[7vh] select-none text-slate-700'>
+    //     Daily Sudoku ({day()})
+    // </h2>
+
     return (
         <div class='h-[99vh] w-screen'>
-            <h2 class='text-3xl md:text-4xl lg:text-5xl lg:pt-10 text-center my-2 h-[7vh] select-none text-slate-700'>
-                Daily Sudoku ({day()})
-            </h2>
+            <TopBar title={'Sudoku'} />
             <Sudoku />
         </div>
     );
 };
 
 const SquarewordHome: Component = () => {
+    // <h2 class='text-3xl md:text-5xl lg:text-5xl lg:pt-10 text-center my-2 h-[7vh] select-none text-slate-700'>
+    //     Daily Squareword ({day()})
+    // </h2>
+
     return (
         <div class='h-[99vh] w-screen'>
-            <h2 class='text-3xl md:text-5xl lg:text-5xl lg:pt-10 text-center my-2 h-[7vh] select-none text-slate-700'>
-                Daily Squareword ({day()})
-            </h2>
+            <TopBar title={'Squareword'} />
             <Squareword />
         </div>
     );
@@ -76,7 +81,7 @@ const ChipSudokuSquare: Component<{ num: number, filled: boolean }> = (props) =>
     }
 
     return (
-        <div class={`justify-center items-center text-center text-sm sm:text-lg border-stone-400 border-1 ${borderClasses()}`}>{props.filled ? props.num : null}</div>
+        <div class={`flex flex-row justify-center items-center text-center text-sm sm:text-lg border-stone-400 border-1 ${borderClasses()}`}>{props.filled ? props.num : null}</div>
     );
 };
 
@@ -173,36 +178,18 @@ const GameCard: Component<{ title: string, href: string, winner: boolean }> = (p
     );
 };
 
-function logout() {
-    sudokuState.clearAll();
-    squarewordState.clearAll();
-    setToken(null);
-    localStorage.clear();
-    window.location.href = '/';
-}
-
 const Home: Component = () => {
-
     return (
-        <div class='w-full h-[90vh] flex flex-col justify-between items-center'>
-            <ProfileCircle />
-            <h1 class='text-8xl mt-14 lg:mt-24'>GOTD</h1>
-            <div class='flex flex-col lg:flex-row'>
-                <GameCard winner={sudokuState.winner()} title='Sudoku' href='/sudoku' />
-                <GameCard winner={squarewordState.winner()} title='Squareword' href='/squareword' />
+        <div class='w-full h-[90vh] flex flex-col justify-start items-center'>
+            <TopBar title='GOTD' />
+
+            <div class='w-full h-full flex flex-col justify-center items-center'>
+                <div class='flex flex-col lg:flex-row'>
+                    <GameCard winner={sudokuState.winner()} title='Sudoku' href='/sudoku' />
+                    <GameCard winner={squarewordState.winner()} title='Squareword' href='/squareword' />
+                </div>
             </div>
         </div>
-    );
-}
-
-const ProfileCircle: Component = () => {
-    // todo(chad): make this a signal and pull the real value
-    function profileImage(): string {
-        return 'https://lh3.googleusercontent.com/a/ACg8ocITyF3_ddmo2xHi8dbjMJ6E7_aD6thOu_HHbSmeQObJuaie=s96-c';
-    }
-
-    return (
-        <img src={profileImage()} class='w-[6vh] h-[6vh] lg:w-[4vh] lg:h-[4vh] rounded-full m-3 absolute border border-1 border-stone-400 right-0' />
     );
 }
 

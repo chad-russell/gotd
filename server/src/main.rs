@@ -16,7 +16,7 @@ use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use sqlx::{
-    postgres::{PgConnectOptions, PgPoolOptions, PgSslMode},
+    postgres::{PgConnectOptions, PgPoolOptions},
     PgPool,
 };
 use tower_http::cors::CorsLayer;
@@ -61,12 +61,12 @@ async fn sudoku_today(
     match found_game {
         Some(found_game) => Ok(Json(found_game)),
         None => {
-            // let generated = sudokugen::generate(sudokugen::Difficulty::Medium);
-            let generated = sudokugen::Sudoku {
-                puzzle: "42897516337612894595136427881975362426784153953429681714258739678361945269543278-",
-                solution: "428975163376128945951364278819753624267841539534296817142587396783619452695432781",
-                difficulty: sudokugen::Difficulty::Medium,
-            };
+            let generated = sudokugen::generate(sudokugen::Difficulty::Medium);
+            // let generated = sudokugen::Sudoku {
+            //     puzzle: "42897516337612894595136427881975362426784153953429681714258739678361945269543278-",
+            //     solution: "428975163376128945951364278819753624267841539534296817142587396783619452695432781",
+            //     difficulty: sudokugen::Difficulty::Medium,
+            // };
 
             let new_id = Uuid::new_v4();
 
@@ -153,8 +153,7 @@ async fn squareword_today(
     match found_game {
         Some(found_game) => Ok(Json(found_game)),
         None => {
-            // let generated = squarewordgen::generate();
-            let generated = "swapspilotarosedenseedged";
+            let generated = squarewordgen::generate();
 
             let new_id = Uuid::new_v4();
 
@@ -393,13 +392,11 @@ async fn main() {
         .acquire_timeout(Duration::from_secs(30))
         .connect_with(
             PgConnectOptions::new()
-                .username("doadmin")
-                .password("AVNS_qgKtUh7sZdZG2fbpl6q")
-                .host("db-postgresql-nyc1-47255-do-user-14375111-0.b.db.ondigitalocean.com")
-                .port(25060)
-                .database("gotd")
-                .ssl_mode(PgSslMode::Require)
-                .ssl_root_cert("./db-certificate.crt"),
+                .username("admin")
+                .password("pgpass")
+                .host("homelab")
+                .port(5432)
+                .database("gotd"),
         )
         .await
         .expect("can't connect to database");

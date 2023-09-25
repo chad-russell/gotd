@@ -1,5 +1,6 @@
 import { createSignal } from 'solid-js';
 import { daysEqual, getDay } from '../util';
+import { setToken, token } from '../auth/auth';
 
 export const [id, setId] = createSignal<string | null>(null);
 export const [loading, setLoading] = createSignal(false);
@@ -26,6 +27,7 @@ export async function loadHistory() {
         let { id, puzzleDay, solution, guess, guessHistory, winner } = JSON.parse(fromStorage);
 
         puzzleDay = new Date(puzzleDay);
+        solution = solution?.map((s: string) => s.toUpperCase());
 
         // If the save is from today, we can use it
         if (daysEqual(puzzleDay, getDay())) {
@@ -66,6 +68,7 @@ export async function loadGameFromServer() {
             guesses.push(resJson.guesses.slice(0, 5));
             resJson.guesses = resJson.guesses.slice(5);
         }
+
         setWinner(true);
         setGuessHistory(guesses);
     }
@@ -88,4 +91,28 @@ export async function loadGameFromServer() {
     }));
 
     setLoading(false);
+}
+
+export async function saveScore() {
+    const res = await fetch('http://localhost:3001/squareword/score', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token()}`,
+        },
+        body: JSON.stringify({
+            puzzle_id: id(),
+            guesses: guessHistory().join(''),
+        }),
+    });
+
+    if (res.status === 401) {
+        setToken(null);
+        return;
+    }
+
+    else if (res.status !== 200) {
+        console.log('Error saving score');
+        return;
+    }
 }

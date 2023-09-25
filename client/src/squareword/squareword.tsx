@@ -4,7 +4,6 @@ import { FaSolidCheck } from 'solid-icons/fa';
 import { DICTIONARY } from './dictionary';
 import { daysEqual, getDay } from '../util';
 import { Portal } from 'solid-js/web';
-import { setToken, token } from '../auth/auth';
 import * as state from './state';
 
 const [showGuess, setShowGuess] = createSignal<boolean>(false);
@@ -18,30 +17,6 @@ const [animatedRow2, setAnimatedRow2] = createSignal<boolean>(false);
 const [animatedRow3, setAnimatedRow3] = createSignal<boolean>(false);
 const [animatedRow4, setAnimatedRow4] = createSignal<boolean>(false);
 const [animatedRow5, setAnimatedRow5] = createSignal<boolean>(false);
-
-export async function saveScore() {
-    const res = await fetch('http://localhost:3001/squareword/score', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token()}`,
-        },
-        body: JSON.stringify({
-            puzzle_id: state.id(),
-            guesses: state.guessHistory().join(''),
-        }),
-    });
-
-    if (res.status === 401) {
-        setToken(null);
-        return;
-    }
-
-    else if (res.status !== 200) {
-        console.log('Error saving score');
-        return;
-    }
-}
 
 function isCorrectDay() {
     return daysEqual(state.puzzleDay(), getDay());
@@ -126,7 +101,6 @@ function winnerRow(row: number, col: number): boolean {
 }
 
 async function saveHistory() {
-    // If local storage is for a different day, clear it and load from server
     if (!isCorrectDay()) {
         localStorage.removeItem('squareword');
         await state.loadGameFromServer();
@@ -265,6 +239,13 @@ const SquarewordKeyboard: Component = () => {
 
 const KeyboardLetter: Component<{ letter: string }> = (props) => {
     let letter = <span>{props.letter}</span>;
+    if (props.letter == 'ENT') {
+        letter = <FaSolidCheck />;
+    }
+    else if (props.letter == 'DEL') {
+        letter = <FiDelete />;
+    }
+
     function colorClasses(): string {
         if (props.letter == 'DEL') {
             letter = <FiDelete />;
@@ -299,24 +280,26 @@ const KeyboardLetter: Component<{ letter: string }> = (props) => {
         return '';
     };
 
+    function buttonPress() {
+        if (props.letter == 'DEL') {
+            if (state.guess().length > 0) {
+                state.guess().pop();
+                state.setGuess([...state.guess()]);
+            }
+        }
+        else if (props.letter == 'ENT') {
+            enterGuess();
+        }
+        else {
+            state.guess().push(props.letter);
+            state.setGuess([...state.guess()]);
+        }
+    }
+
     return <button
         style='font-size: min(6vw, 4vh)'
         class={`py-1 px-2 md:px-3 mx-[1px] md:mx-[2px] border border-stone-800 rounded-md select-none ${colorClasses()}`}
-        onClick={() => {
-            if (props.letter == 'DEL') {
-                if (state.guess().length > 0) {
-                    state.guess().pop();
-                    state.setGuess([...state.guess()]);
-                }
-            }
-            else if (props.letter == 'ENT') {
-                enterGuess();
-            }
-            else {
-                state.guess().push(props.letter);
-                state.setGuess([...state.guess()]);
-            }
-        }}
+        onClick={buttonPress}
     >
         {letter}
     </button>
@@ -425,6 +408,10 @@ const SolutionTile: Component<{ col: number, row: number }> = (props) => {
 
     function animateBg() {
         if (alreadyGuessedCorrectSolution(props.row, props.col)) {
+            if (animatingRow(props.row)) {
+                return 'animate-wow bg-green-500';
+            }
+
             return 'bg-green-500';
         }
 
@@ -632,14 +619,17 @@ export const Squareword: Component = () => {
         });
 
         createEffect(() => {
-            const a = state.solution();
-            const gs = state.guessHistory();
-
-            if (!a) {
+            if (state.winner()) {
                 return;
             }
 
-            if (gs.length < 5) {
+            const id = state.id();
+            if (!id) {
+                return;
+            }
+
+            const gh = state.guessHistory();
+            if (gh.length < 5) {
                 return;
             }
 
@@ -651,26 +641,28 @@ export const Squareword: Component = () => {
                 }
             }
 
-            if (state.winner()) {
+            if (animatingRowOrBelow(0)) {
                 return;
             }
 
-            state.setWinner(true);
-            saveScore();
+            setTimeout(() => {
+                state.setWinner(true);
+                state.saveScore();
+            }, 1200);
         });
     });
 
     window.addEventListener('keydown', (e) => {
-        // If holding down command or control, ignore
         if (e.metaKey || e.ctrlKey) {
             return null;
         }
 
         if (e.key >= 'a' && e.key <= 'z') {
             if (state.guess().length < 5) {
-                state.guess().push(e.key);
+                state.guess().push(e.key.toUpperCase());
                 state.setGuess([...state.guess()]);
             }
+            return null;
         }
         switch (e.key) {
             case 'Backspace':

@@ -8,13 +8,7 @@ import { daysEqual, getDay } from '../util';
 import { setToken, token } from '../auth/auth';
 import * as state from './state';
 
-// const puzzle = {
-//     puzzle: "--89---6---6-2--45951----7----7-3----6-8---3---4--6-1---2---39-78-6---526-5-3----",
-//     solution: "428975163376128945951364278819753624267841539534296817142587396783619452695432781",
-//     difficulty: "medium",
-// };
-//
-// const puzzle2 = {
+// const easyPuzzle = {
 //     puzzle: "42897516337612894595136427881975362426784153953429681714258739678361945269543278-",
 //     solution: "428975163376128945951364278819753624267841539534296817142587396783619452695432781",
 //     difficulty: "medium",
@@ -43,7 +37,6 @@ function swapInputStyle() {
 }
 
 async function saveHistory() {
-    // If local storage is for a different day, clear it and load from server
     if (!isCorrectDay()) {
         localStorage.removeItem('sudoku');
         await state.loadGameFromServer();
@@ -257,20 +250,29 @@ function allFilled(n: number | null) {
     return count === 9;
 }
 
-const Notes: Component<{ n: number }> = (props) => {
+const Note: Component<{ n: number, notenum: number }> = (props) => {
     const notes = () => curGameState()?.cells[props.n]?.notes;
 
     return (
+        <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>
+            {notes()?.includes(props.notenum) ? props.notenum : null}
+        </div>
+    );
+}
+
+const Notes: Component<{ n: number }> = (props) => {
+
+    return (
         <div class='grid grid-rows-3 grid-cols-3 w-full h-full'>
-            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes()?.includes(1) ? 1 : null}</div>
-            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes()?.includes(2) ? 2 : null}</div>
-            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes()?.includes(3) ? 3 : null}</div>
-            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes()?.includes(4) ? 4 : null}</div>
-            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes()?.includes(5) ? 5 : null}</div>
-            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes()?.includes(6) ? 6 : null}</div>
-            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes()?.includes(7) ? 7 : null}</div>
-            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes()?.includes(8) ? 8 : null}</div>
-            <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>{notes()?.includes(9) ? 9 : null}</div>
+            <Note n={props.n} notenum={1} />
+            <Note n={props.n} notenum={2} />
+            <Note n={props.n} notenum={3} />
+            <Note n={props.n} notenum={4} />
+            <Note n={props.n} notenum={5} />
+            <Note n={props.n} notenum={6} />
+            <Note n={props.n} notenum={7} />
+            <Note n={props.n} notenum={8} />
+            <Note n={props.n} notenum={9} />
         </div>
     );
 }
@@ -303,7 +305,7 @@ const SudokuCell: Component<{ n: number }> = (props) => {
 
     function bgStyle() {
         if (state.winner()) {
-            // subscribe to changes in winnerColorChange
+            // For subscription purposes only
             winnerColorChange();
 
             let tailwindColorsList = ['bg-red-400', 'bg-orange-400', 'bg-yellow-400', 'bg-green-400', 'bg-blue-400', 'bg-purple-400', 'bg-pink-400'];
@@ -394,21 +396,32 @@ const SudokuCell: Component<{ n: number }> = (props) => {
     }
 
     function radiusStyle() {
+        // Top left corner
         if (props.n === 0) {
             return 'rounded-tl-xl md:rounded-tl-2xl border-t-[1px] md:border-t-[2px] border-l-[1px] md:border-l-[2px]';
         }
+
+        // Top side
         else if (props.n > 0 && props.n < 8) {
             return 'border-t-[1px] md:border-t-[2px]';
         }
+
+        // Top right corner
         else if (props.n === 8) {
             return 'rounded-tr-xl md:rounded-tr-2xl border-t-[1px] md:border-t-[2px] border-r-[1px] md:border-r-[2px]';
         }
+
+        // Bottom left corner
         else if (props.n === 72) {
             return 'rounded-bl-xl md:rounded-bl-2xl border-b-[1px] md:border-b-[2px] border-l-[1px] md:border-l-[2px]';
         }
+
+        // Bottom side
         else if (props.n > 72 && props.n < 80) {
             return 'border-b-[1px] md:border-b-[2px]';
         }
+
+        // Bottom right corner
         else if (props.n === 80) {
             return 'rounded-br-xl md:rounded-br-2xl border-b-[1px] md:border-b-[2px] border-r-[1px] md:border-r-[2px]';
         }
@@ -483,7 +496,7 @@ const SudokuInputNumber: Component<{ n: number }> = (props) => {
             return 'text-gray-400 lg:py-5';
         }
 
-        return 'hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200 text-slate-600 lg:py-5 border border-stone-300';
+        return 'hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200 text-slate-600 py-1 lg:py-5 border border-stone-300';
     }
 
     return (
@@ -500,7 +513,7 @@ const SudokuInputNumber: Component<{ n: number }> = (props) => {
 
 const SudokuNumberPad: Component = () => {
     return (
-        <div class='grid grid-cols-3 grid-rows-3 mt-5 mb-2 w-[100vw] max-w-[50vh] lg:max-h-[35vh] lg:ml-6'>
+        <div class='grid grid-cols-3 grid-rows-3 mt-2 md:mt-5 mb-2 w-[100vw] max-w-[50vh] lg:max-h-[35vh] lg:ml-6'>
             <SudokuInputNumber n={1} />
             <SudokuInputNumber n={2} />
             <SudokuInputNumber n={3} />
@@ -662,13 +675,13 @@ async function saveScore() {
 
 export const Sudoku: Component = () => {
     onMount(() => {
+        state.loadHistory();
+
         setInterval(() => {
             if (!state.winner() && !state.paused()) {
                 state.setSeconds(s => s + 1);
             }
         }, 1000);
-
-        state.loadHistory();
 
         createEffect(() => {
             saveHistory();
@@ -765,12 +778,19 @@ export const Sudoku: Component = () => {
                     case 'Delete':
                         clearCell();
                         return null;
+                    case 'n':
+                        swapInputStyle();
+                        return null;
+                    case ' ':
+                        state.setPaused(!state.paused());
+                        return null;
                     case 'z':
                         if (e.metaKey || e.ctrlKey) {
                             undo();
                         }
                         return null;
                     default:
+                        console.log(e.key);
                         return null;
                 }
             })();

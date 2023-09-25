@@ -8,6 +8,14 @@ export function loggedIn() {
     return token() !== null;
 }
 
+export function logout() {
+    sudokuState.clearAll();
+    squarewordState.clearAll();
+    setToken(null);
+    localStorage.clear();
+    window.location.href = '/';
+}
+
 const LoginButton: Component = () => {
     const btn = <div id="buttonDiv"></div>;
 
