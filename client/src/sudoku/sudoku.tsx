@@ -650,7 +650,7 @@ const Timer: Component = () => {
 }
 
 async function saveScore() {
-    const res = await fetch('http://localhost:3001/sudoku/score', {
+    const res = await fetch('http://server:3001/sudoku/score', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

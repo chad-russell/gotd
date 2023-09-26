@@ -51,7 +51,7 @@ export async function loadGameFromServer() {
     }
     setLoading(true);
 
-    const res = await fetch('http://localhost:3001/squareword/today');
+    const res = await fetch('http://server:3001/squareword/today');
     const resJson = await res.json();
 
     const sol = resJson.solution;
@@ -94,7 +94,7 @@ export async function loadGameFromServer() {
 }
 
 export async function saveScore() {
-    const res = await fetch('http://localhost:3001/squareword/score', {
+    const res = await fetch('http://server:3001/squareword/score', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

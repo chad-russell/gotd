@@ -83,7 +83,7 @@ export async function loadGameFromServer() {
     setLoading(true);
 
     // read from the `/sudoku/today` endpoint of the server
-    let res = await fetch('http://localhost:3001/sudoku/today');
+    let res = await fetch('http://server:3001/sudoku/today');
     let p = await res.json();
 
     const cells: CellState[] = p.puzzle.split('').map((c: string) => {
