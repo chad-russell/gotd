@@ -1,6 +1,7 @@
 import { Component, createSignal, onMount } from "solid-js";
 import * as squarewordState from "../squareword/state";
 import * as sudokuState from "../sudoku/state";
+import { baseUrl } from "../util";
 
 export const [token, setToken] = createSignal<string | null>(null);
 
@@ -20,7 +21,7 @@ const LoginButton: Component = () => {
     const btn = <div id="buttonDiv"></div>;
 
     async function handleCredentialResponse(response: { credential: any; }) {
-        const res = await fetch('http://server:3001/login', {
+        const res = await fetch(`http://${baseUrl()}/login`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -42,6 +43,9 @@ const LoginButton: Component = () => {
     }
 
     onMount(() => {
+        const baseUrl = new URL(import.meta.url).origin;
+        console.log('base url:', baseUrl);
+
         google.accounts.id.initialize({
             client_id: "1012807370880-93eor5h650abjrreks9ut5f5dp5tv67q.apps.googleusercontent.com",
             callback: handleCredentialResponse

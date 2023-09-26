@@ -1,20 +1,9 @@
 services:
-  # db:
-  #   image: postgres
-  #   restart: always
-  #   environment:
-  #     POSTGRES_USER: admin
-  #     POSTGRES_DB: gotd
-  #     POSTGRES_PASSWORD: pgpass
-  #   volumes:
-  #     - ./pgdata:/var/lib/postgresql/data
   server:
     build: ./server
     restart: always
     ports: 
       - "3001:3001"
-    # depends_on:
-    #   - db
     extra_hosts:
       - "host.docker.internal:host-gateway"
   client:

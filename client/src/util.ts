@@ -1,3 +1,7 @@
+export function baseUrl(): string {
+    return new URL(import.meta.url).origin;
+}
+
 export function dateAtMidnight(d: Date): Date {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }

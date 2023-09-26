@@ -1,7 +1,0 @@
-:80 {
-	root * .
-
-	file_server
-
-	# reverse_proxy localhost:8080
-}
