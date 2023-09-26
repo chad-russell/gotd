@@ -1,5 +1,6 @@
 export function baseUrl(): string {
-    return new URL(import.meta.url).origin;
+    // return 'http://localhost:3001';
+    return 'https://gotd.crussell.io/api';
 }
 
 export function dateAtMidnight(d: Date): Date {

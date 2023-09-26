@@ -21,7 +21,7 @@ const LoginButton: Component = () => {
     const btn = <div id="buttonDiv"></div>;
 
     async function handleCredentialResponse(response: { credential: any; }) {
-        const res = await fetch(`http://${baseUrl()}/login`, {
+        const res = await fetch(`${baseUrl()}/login`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -43,8 +43,8 @@ const LoginButton: Component = () => {
     }
 
     onMount(() => {
-        const baseUrl = new URL(import.meta.url).origin;
-        console.log('base url:', baseUrl);
+        const baseUrl = new URL(import.meta.url).origin
+        console.log('base url:', import.meta.env.BASE_URL);
 
         google.accounts.id.initialize({
             client_id: "1012807370880-93eor5h650abjrreks9ut5f5dp5tv67q.apps.googleusercontent.com",

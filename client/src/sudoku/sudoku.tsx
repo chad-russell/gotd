@@ -4,7 +4,7 @@ import { TbNumbers } from 'solid-icons/tb'
 import { FiDelete } from 'solid-icons/fi'
 import { BsPatchQuestionFill, BsPauseCircle, BsPlayCircle } from 'solid-icons/bs'
 import { BsPencil } from 'solid-icons/bs'
-import { daysEqual, getDay } from '../util';
+import { baseUrl, daysEqual, getDay } from '../util';
 import { setToken, token } from '../auth/auth';
 import * as state from './state';
 
@@ -650,7 +650,7 @@ const Timer: Component = () => {
 }
 
 async function saveScore() {
-    const res = await fetch('http://server:3001/sudoku/score', {
+    const res = await fetch(`${baseUrl()}/sudoku/score`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
