@@ -20,7 +20,7 @@ const LoginButton: Component = () => {
     const btn = <div id="buttonDiv"></div>;
 
     async function handleCredentialResponse(response: { credential: any; }) {
-        const res = await fetch('http://localhost:3001/login', {
+        const res = await fetch('http://server:3001/login', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
