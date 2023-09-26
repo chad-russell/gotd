@@ -434,8 +434,8 @@ async fn main() {
         // .route("/squareword/score", post(save_squareword_score))
         // .route("/login", post(login))
         // .route("/check_auth", get(check_auth))
-        .layer(CorsLayer::permissive());
-    // .with_state(pool);
+        .layer(CorsLayer::permissive())
+        .with_state(pool);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3001));
 
