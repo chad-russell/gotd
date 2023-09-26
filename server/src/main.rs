@@ -386,15 +386,15 @@ struct Args {
 }
 
 async fn pong() -> String {
-    return "pong\n".to_string()
+    return "pong\n".to_string();
 }
 
 async fn test_db(State(pool): State<PgPool>) -> Result<String, (StatusCode, String)> {
-    let user: Option<User> = sqlx::query_as("select * from users where email = $1")
-        .bind(&token.claims.email)
-        .fetch_optional(&pool)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let user: Option<User> =
+        sqlx::query_as("select * from users where email = 'chaddouglasrussell@gmail.com'")
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(user.unwrap().id.to_string())
 }
@@ -435,7 +435,7 @@ async fn main() {
         // .route("/login", post(login))
         // .route("/check_auth", get(check_auth))
         .layer(CorsLayer::permissive());
-        // .with_state(pool);
+    // .with_state(pool);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3001));
 
