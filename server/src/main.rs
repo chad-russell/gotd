@@ -385,6 +385,20 @@ struct Args {
     db_host: String,
 }
 
+async fn pong() -> String {
+    return "pong\n".to_string();
+}
+
+async fn test_db(State(pool): State<PgPool>) -> Result<String, (StatusCode, String)> {
+    let user: Option<User> =
+        sqlx::query_as("select * from users where email = 'chaddouglasrussell@gmail.com'")
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(user.unwrap().id.to_string())
+}
+
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
@@ -412,6 +426,8 @@ async fn main() {
         .expect("can't connect to database");
 
     let app = Router::new()
+        .route("/ping", get(pong))
+        .route("/test_db", get(test_db))
         .route("/sudoku/today", get(sudoku_today))
         .route("/sudoku/score", post(save_sudoku_score))
         .route("/squareword/today", get(squareword_today))
@@ -421,6 +437,7 @@ async fn main() {
         .layer(CorsLayer::permissive())
         .with_state(pool);
 
+    // let addr = SocketAddr::from(([127, 0, 0, 1], 3001));
     let addr = SocketAddr::from(([0, 0, 0, 0], 3001));
 
     tracing::debug!("listening on {}", addr);
