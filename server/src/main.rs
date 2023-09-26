@@ -386,7 +386,17 @@ struct Args {
 }
 
 async fn pong() -> String {
-    return "pong".to_string()
+    return "pong\n".to_string()
+}
+
+async fn test_db(State(pool): State<PgPool>) -> Result<String, (StatusCode, String)> {
+    let user: Option<User> = sqlx::query_as("select * from users where email = $1")
+        .bind(&token.claims.email)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(user.unwrap().id.to_string())
 }
 
 #[tokio::main]
@@ -401,22 +411,23 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // let pool = PgPoolOptions::new()
-    //     .max_connections(5)
-    //     .acquire_timeout(Duration::from_secs(30))
-    //     .connect_with(
-    //         PgConnectOptions::new()
-    //             .username("admin")
-    //             .password("pgpass")
-    //             .host(&args.db_host)
-    //             .port(5432)
-    //             .database("gotd"),
-    //     )
-    //     .await
-    //     .expect("can't connect to database");
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .acquire_timeout(Duration::from_secs(30))
+        .connect_with(
+            PgConnectOptions::new()
+                .username("admin")
+                .password("pgpass")
+                .host(&args.db_host)
+                .port(5432)
+                .database("gotd"),
+        )
+        .await
+        .expect("can't connect to database");
 
     let app = Router::new()
         .route("/ping", get(pong))
+        .route("/test_db", get(test_db))
         // .route("/sudoku/today", get(sudoku_today))
         // .route("/sudoku/score", post(save_sudoku_score))
         // .route("/squareword/today", get(squareword_today))
