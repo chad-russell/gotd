@@ -513,7 +513,7 @@ const SudokuInputNumber: Component<{ n: number }> = (props) => {
 
 const SudokuNumberPad: Component = () => {
     return (
-        <div class='grid grid-cols-3 grid-rows-3 mt-2 md:mt-5 mb-2 w-[100vw] max-w-[50vh] lg:max-h-[35vh] lg:ml-6'>
+        <div class='grid grid-cols-3 grid-rows-3 mt-2 md:mt-5 mb-2 w-[100vw] max-w-[50vh] max-h-[20vh] lg:max-h-[35vh] lg:ml-6'>
             <SudokuInputNumber n={1} />
             <SudokuInputNumber n={2} />
             <SudokuInputNumber n={3} />
@@ -806,7 +806,7 @@ export const Sudoku: Component = () => {
     return (
         <Show when={state.id() != null && state.history() !== null && !state.loading()} fallback={<div>Loading...</div>}>
             <div class='h-[75vh] lg:h-[90vh] flex flex-col justify-between items-center lg:flex-row lg:justify-center m-1'>
-                <div class='flex flex-col max-h-[50vh] max-w-[50vh] w-full lg:max-h-[75vh] lg:max-w-[75vh]'>
+                <div class='flex flex-col max-h-[46vh] max-w-[46vh] w-full lg:max-h-[75vh] lg:max-w-[75vh]'>
                     <Timer />
                     <SudokuBoard />
                 </div>
