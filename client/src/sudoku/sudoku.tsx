@@ -476,7 +476,7 @@ const Sudoku3x3: Component<{ n: number, border: string[] }> = (props) => {
     }
 
     return (
-        <div class={`grid grid-cols-3 overflow-hidden grid-rows-3 max-h-full w-full aspect-square border-stone-600 ${borderStyle()}`}>
+        <div class={`grid grid-cols-3 overflow-hidden grid-rows-3 h-full w-full aspect-square border-stone-600 ${borderStyle()}`}>
             <SudokuCell n={props.n} />
             <SudokuCell n={props.n + 1} />
             <SudokuCell n={props.n + 2} />
@@ -513,7 +513,7 @@ const SudokuInputNumber: Component<{ n: number }> = (props) => {
 
 const SudokuNumberPad: Component = () => {
     return (
-        <div class='grid grid-cols-3 grid-rows-3 mt-2 md:mt-5 mb-2 w-[100vw] max-w-[50vh] max-h-[20vh] lg:max-h-[35vh] lg:ml-6'>
+        <div class='grid grid-cols-3 grid-rows-3 pt-2 mb-2 w-full h-[50%] lg:w-[100%] lg:max-h-[70%]'>
             <SudokuInputNumber n={1} />
             <SudokuInputNumber n={2} />
             <SudokuInputNumber n={3} />
@@ -529,7 +529,7 @@ const SudokuNumberPad: Component = () => {
 
 const SudokuBoard: Component = () => {
     return (
-        <div class='grid grid-cols-3 grid-rows-3 overflow-hidden aspect-square'>
+        <div style='height: calc(min(50vh, 85vw) + 10vw); width: calc(min(50vh, 85vw) + 10vw);' class='aspect-square grid grid-cols-3 grid-rows-3'>
             <Sudoku3x3 n={0} border={['b', 'r']} />
             <Sudoku3x3 n={3} border={['b']} />
             <Sudoku3x3 n={6} border={['b', 'l']} />
@@ -554,7 +554,7 @@ const InputStyle: Component = () => {
 
     return (
         <div
-            class='col-span-1 flex flex-col items-center justify-center border text-slate-700 bg-white border-stone-800 rounded-md py-1 m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
+            class='col-span-1 flex flex-col items-center justify-center h-[90%] border text-slate-700 bg-white border-stone-800 rounded-md py-1 m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
             onClick={() => swapInputStyle()}
         >
             <button
@@ -577,10 +577,10 @@ const InputStyle: Component = () => {
 
 const SudokuIcons: Component = () => {
     return (
-        <div class='grid grid-cols-4 lg:ml-6 select-none'>
+        <div class='grid grid-cols-4 select-none h-[min(60px, 10vh)] w-full'>
             <button
                 style='font-size: min(2.5vh, 5vw)'
-                class='flex flex-col justify-end items-center border border-stone-800 text-slate-700 bg-white rounded-md py-1 m-1 hover:bg-none sm:hover:bg-red-100 active:bg-red-200 sm:active:bg-red-200'
+                class='flex flex-col justify-center items-center h-[90%] border border-stone-800 text-slate-700 bg-white rounded-md m-1 hover:bg-none sm:hover:bg-red-100 active:bg-red-200 sm:active:bg-red-200'
                 disabled={state.winner() || state.paused() || state.history()?.length === 1}
                 onClick={() => undo()}
             >
@@ -589,7 +589,7 @@ const SudokuIcons: Component = () => {
             </button>
             <button
                 style='font-size: min(2.5vh, 5vw)'
-                class='flex flex-col justify-end items-center border text-slate-700 bg-white border-stone-800 rounded-md py-1 m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
+                class='flex flex-col justify-center items-center h-[90%] h-full border text-slate-700 bg-white border-stone-800 rounded-md m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
                 disabled={state.winner() || state.paused()}
                 onClick={() => clearCell()}
             >
@@ -599,7 +599,7 @@ const SudokuIcons: Component = () => {
             <InputStyle />
             <button
                 disabled={state.winner() || noErrAnim() || state.paused()}
-                style='font-size: min(2.5vh, 5vw)' class='flex flex-col justify-end items-center border text-slate-700 bg-white border-stone-800 rounded-md py-1 m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
+                style='font-size: min(2.5vh, 5vw)' class='flex flex-col justify-center items-center h-[90%] border text-slate-700 bg-white border-stone-800 rounded-md m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
                 onClick={() => checkCells()}
             >
                 <BsPatchQuestionFill color="rgb(47, 41, 36)" />
@@ -790,7 +790,7 @@ export const Sudoku: Component = () => {
                         }
                         return null;
                     default:
-                        console.log(e.key);
+                        // console.log(e.key);
                         return null;
                 }
             })();
@@ -805,14 +805,16 @@ export const Sudoku: Component = () => {
 
     return (
         <Show when={state.id() != null && state.history() !== null && !state.loading()} fallback={<div>Loading...</div>}>
-            <div class='h-[75vh] lg:h-[90vh] flex flex-col justify-between items-center lg:flex-row lg:justify-center m-1'>
-                <div class='flex flex-col max-h-[48vh] max-w-[48vh] w-full lg:max-h-[75vh] lg:max-w-[75vh]'>
+            <div class='h-full w-full flex flex-col items-center lg:flex-row lg:justify-center p-1'>
+                <div class='flex flex-col w-full lg:h-[80%] items-center justify-start xl:mx-8 xl:w-[42%]'>
                     <Timer />
                     <SudokuBoard />
                 </div>
-                <div>
-                    <SudokuIcons />
-                    <SudokuNumberPad />
+                <div class='w-full h-full flex flex-row items-center justify-center xl:w-[30%]'>
+                    <div class='w-full h-full lg:h-[80%] lg:flex lg:flex-col lg:items-center lg:justify-center'>
+                        <SudokuIcons />
+                        <SudokuNumberPad />
+                    </div>
                 </div>
             </div>
         </Show>

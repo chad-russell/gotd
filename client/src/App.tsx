@@ -8,12 +8,8 @@ import * as sudokuState from './sudoku/state';
 import { TopBar } from './common/topBar';
 
 const SudokuHome: Component = () => {
-    // <h2 class='text-3xl md:text-4xl lg:text-5xl lg:pt-10 text-center my-2 h-[7vh] select-none text-slate-700'>
-    //     Daily Sudoku ({day()})
-    // </h2>
-
     return (
-        <div class='h-[99vh] w-screen'>
+        <div class='h-full w-full flex flex-col justify-between items-center'>
             <TopBar title={'Sudoku'} />
             <Sudoku />
         </div>
@@ -21,12 +17,8 @@ const SudokuHome: Component = () => {
 };
 
 const SquarewordHome: Component = () => {
-    // <h2 class='text-3xl md:text-5xl lg:text-5xl lg:pt-10 text-center my-2 h-[7vh] select-none text-slate-700'>
-    //     Daily Squareword ({day()})
-    // </h2>
-
     return (
-        <div class='h-[99vh] w-screen'>
+        <div class='h-full w-full flex-col justify-between items-center'>
             <TopBar title={'Squareword'} />
             <Squareword />
         </div>
@@ -164,7 +156,7 @@ const GameCard: Component<{ title: string, href: string, winner: boolean }> = (p
 
 const Home: Component = () => {
     return (
-        <div class='w-full h-[90vh] flex flex-col justify-start items-center'>
+        <div class='w-full h-full flex flex-col justify-start items-center'>
             <TopBar title='GOTD' />
 
             <div class='w-full h-full flex flex-col justify-center items-center'>
