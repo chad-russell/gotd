@@ -611,6 +611,8 @@ const GuessModal = () => {
 };
 
 export const Squareword: Component = () => {
+    const [pendingWinner, setPendingWinner] = createSignal<boolean>(false);
+
     onMount(() => {
         state.loadHistory();
 
@@ -619,7 +621,7 @@ export const Squareword: Component = () => {
         });
 
         createEffect(() => {
-            if (state.winner()) {
+            if (state.winner() || pendingWinner()) {
                 return;
             }
 
@@ -645,9 +647,11 @@ export const Squareword: Component = () => {
                 return;
             }
 
+            setPendingWinner(true);
+
             setTimeout(() => {
-                state.setWinner(true);
                 state.saveScore();
+                state.setWinner(true);
             }, 1200);
         });
     });

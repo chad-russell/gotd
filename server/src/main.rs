@@ -45,10 +45,12 @@ struct SudokuGame {
 }
 
 async fn sudoku_today(
+    user: User,
     State(pool): State<PgPool>,
 ) -> Result<Json<SudokuGame>, (StatusCode, String)> {
     let found_game: Option<SudokuGame> =
-        sqlx::query_as("select p.id, p.puzzle, p.solution, p.day, s.seconds from sudoku_puzzles p left join sudoku_scores s on s.puzzle_id=p.id where day = $1")
+        sqlx::query_as("select p.id, p.puzzle, p.solution, p.day, s.seconds from sudoku_puzzles p left join sudoku_scores s on s.puzzle_id=p.id and s.user_id = $1 where day = $2")
+            .bind(&user.id)
             .bind(&midnight_today())
             .fetch_optional(&pool)
             .await
@@ -137,10 +139,12 @@ struct SquarewordGame {
 }
 
 async fn squareword_today(
+    user: User,
     State(pool): State<PgPool>,
 ) -> Result<Json<SquarewordGame>, (StatusCode, String)> {
     let found_game: Option<SquarewordGame> =
-        sqlx::query_as("select p.id, p.solution, p.day, s.guesses from squareword_puzzles p left join squareword_scores s on s.puzzle_id=p.id where day = $1")
+        sqlx::query_as("select p.id, p.solution, p.day, s.guesses from squareword_puzzles p left join squareword_scores s on s.puzzle_id=p.id and s.user_id = $1 where p.day = $2")
+            .bind(&user.id)
             .bind(&midnight_today())
             .fetch_optional(&pool)
             .await
@@ -216,7 +220,7 @@ struct User {
     id: Uuid,
     name: String,
     email: String,
-    picture: String,
+    picture: Option<String>,
     created_at: DateTime<Utc>,
     last_login: DateTime<Utc>,
 }
@@ -229,7 +233,7 @@ struct GoogleJwt {
     email: String,
     email_verified: bool,
     name: String,
-    picture: String,
+    picture: Option<String>,
     given_name: String,
     family_name: String,
     iat: i64,
@@ -320,7 +324,7 @@ async fn login(
                 .bind(&user.id)
                 .bind(&user.name)
                 .bind(&user.email)
-                .bind(&user.picture)
+                .bind(&(user.picture.clone().unwrap_or_else(|| "".to_string())))
                 .bind(&user.created_at)
                 .bind(&user.last_login)
                 .execute(&pool)
@@ -389,16 +393,6 @@ async fn pong() -> String {
     return "pong\n".to_string();
 }
 
-async fn test_db(State(pool): State<PgPool>) -> Result<String, (StatusCode, String)> {
-    let user: Option<User> =
-        sqlx::query_as("select * from users where email = 'chaddouglasrussell@gmail.com'")
-            .fetch_optional(&pool)
-            .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    Ok(user.unwrap().id.to_string())
-}
-
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
@@ -427,7 +421,6 @@ async fn main() {
 
     let app = Router::new()
         .route("/ping", get(pong))
-        .route("/test_db", get(test_db))
         .route("/sudoku/today", get(sudoku_today))
         .route("/sudoku/score", post(save_sudoku_score))
         .route("/squareword/today", get(squareword_today))

@@ -2,11 +2,36 @@ import { Component, createSignal, onMount } from "solid-js";
 import * as squarewordState from "../squareword/state";
 import * as sudokuState from "../sudoku/state";
 import { baseUrl } from "../util";
+import jwt_decode from "jwt-decode";
 
 export const [token, setToken] = createSignal<string | null>(null);
 
 export function loggedIn() {
     return token() !== null;
+}
+
+export function username() {
+    const t = token();
+
+    if (!t) {
+        return null;
+    }
+
+    const payload = jwt_decode(t) as any;
+    console.log('payload:', payload);
+    return payload['name'];
+}
+
+export function profilePic() {
+    const t = token();
+
+    if (!t) {
+        return null;
+    }
+
+    const payload = jwt_decode(t) as any;
+    console.log('payload:', payload);
+    return payload['picture'];
 }
 
 export function logout() {
@@ -43,9 +68,6 @@ const LoginButton: Component = () => {
     }
 
     onMount(() => {
-        const baseUrl = new URL(import.meta.url).origin
-        console.log('base url:', import.meta.env.BASE_URL);
-
         google.accounts.id.initialize({
             client_id: "1012807370880-93eor5h650abjrreks9ut5f5dp5tv67q.apps.googleusercontent.com",
             callback: handleCredentialResponse

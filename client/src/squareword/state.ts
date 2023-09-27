@@ -51,7 +51,11 @@ export async function loadGameFromServer() {
     }
     setLoading(true);
 
-    const res = await fetch(`${baseUrl()}/squareword/today`);
+    const res = await fetch(`${baseUrl()}/squareword/today`, {
+        headers: {
+            'Authorization': `Bearer ${token()}`
+        }
+    });
     const resJson = await res.json();
 
     const sol = resJson.solution;
