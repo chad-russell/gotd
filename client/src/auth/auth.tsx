@@ -18,7 +18,6 @@ export function username() {
     }
 
     const payload = jwt_decode(t) as any;
-    console.log('payload:', payload);
     return payload['name'];
 }
 
@@ -30,7 +29,6 @@ export function profilePic() {
     }
 
     const payload = jwt_decode(t) as any;
-    console.log('payload:', payload);
     return payload['picture'];
 }
 

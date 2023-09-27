@@ -272,8 +272,17 @@ const KeyboardLetter: Component<{ letter: string }> = (props) => {
         // If the letter has been guessed at all and we haven't already returned yellow,
         // then it's correct so return green
         for (let guess of state.guessHistory()) {
-            if (guess.includes(props.letter.toLowerCase())) {
-                return 'bg-green-200';
+            if (guess.includes(props.letter)) {
+                // If the letter is anywhere in the answer return green. Else, grey
+                for (let i = 0; i < 5; i++) {
+                    for (let j = 0; j < 5; j++) {
+                        if (correctLetter(i + 1, j) == props.letter.toLowerCase()) {
+                            return 'bg-green-200';
+                        }
+                    }
+                }
+
+                return 'bg-gray-400';
             }
         }
 
@@ -685,7 +694,7 @@ export const Squareword: Component = () => {
 
     return (
         <Show when={state.id() && !state.loading()} fallback={<div>Loading...</div>}>
-            <div class='h-[90vh] flex flex-col justify-center items-center m-1'>
+            <div class='h-[75vh] md:h-[90vh] flex flex-col justify-center items-center m-1'>
                 <div class='flex flex-col max-h-[90vh] max-w-[60vh] w-full'>
                     <SquarewordBoard />
                     <SquarewordKeyboard />

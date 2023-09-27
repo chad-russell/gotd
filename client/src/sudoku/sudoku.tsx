@@ -805,7 +805,7 @@ export const Sudoku: Component = () => {
 
     return (
         <Show when={state.id() != null && state.history() !== null && !state.loading()} fallback={<div>Loading...</div>}>
-            <div class='h-[90vh] flex flex-col justify-between items-center lg:flex-row lg:justify-center m-1'>
+            <div class='h-[75vh] md:h-[90vh] flex flex-col justify-between items-center lg:flex-row lg:justify-center m-1'>
                 <div class='flex flex-col max-h-[50vh] max-w-[50vh] w-full lg:max-h-[75vh] lg:max-w-[75vh]'>
                     <Timer />
                     <SudokuBoard />
