@@ -5,23 +5,7 @@ import { LoginScreen, loggedIn, token, setToken } from './auth/auth';
 import { Squareword } from './squareword/squareword';
 import * as squarewordState from './squareword/state';
 import * as sudokuState from './sudoku/state';
-import { breakpoints } from './util';
-import { createBreakpoints } from "@solid-primitives/media";
 import { TopBar } from './common/topBar';
-
-const matches = createBreakpoints(breakpoints);
-
-function day(): string {
-    const d = new Date();
-
-    if (!matches.sm) {
-        return `${d.getMonth() + 1}/${d.getDate()}`;
-    }
-
-    const months = ['Jan.', 'Feb.', 'Mar.', 'Apr.', 'May', 'Jun.', 'Jul.', 'Aug.', 'Sep.', 'Oct.', 'Nov.', 'Dec.'];
-
-    return `${months[d.getMonth()]} ${d.getDate()}`;
-}
 
 const SudokuHome: Component = () => {
     // <h2 class='text-3xl md:text-4xl lg:text-5xl lg:pt-10 text-center my-2 h-[7vh] select-none text-slate-700'>
