@@ -175,8 +175,8 @@ const App: Component = () => {
         if (localToken !== null) {
             setToken(localToken);
 
-            squarewordState.loadHistory();
-            sudokuState.loadHistory();
+            squarewordState.loadGameFromServer();
+            sudokuState.loadGameFromServer();
         }
     });
 

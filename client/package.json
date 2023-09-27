@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@solid-primitives/media": "^2.2.5",
+    "@solid-primitives/scheduled": "^1.4.1",
     "@solidjs/router": "^0.8.3",
     "immutable": "^4.3.2",
     "solid-icons": "^1.0.11",

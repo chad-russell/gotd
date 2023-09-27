@@ -4,8 +4,7 @@ import { TbNumbers } from 'solid-icons/tb'
 import { FiDelete } from 'solid-icons/fi'
 import { BsPatchQuestionFill, BsPauseCircle, BsPlayCircle } from 'solid-icons/bs'
 import { BsPencil } from 'solid-icons/bs'
-import { baseUrl, daysEqual, getDay } from '../util';
-import { setToken, token } from '../auth/auth';
+import { daysEqual, getDay } from '../util';
 import * as state from './state';
 
 // const easyPuzzle = {
@@ -36,13 +35,12 @@ function swapInputStyle() {
     }
 }
 
-async function saveHistory() {
+async function saveState() {
     if (!isCorrectDay()) {
-        localStorage.removeItem('sudoku');
         await state.loadGameFromServer();
     }
 
-    state.saveLocal();
+    state.saveState();
 }
 
 function curGameState(): state.GameState {
@@ -589,7 +587,7 @@ const SudokuIcons: Component = () => {
             </button>
             <button
                 style='font-size: min(2.5vh, 5vw)'
-                class='flex flex-col justify-center items-center h-[90%] h-full border text-slate-700 bg-white border-stone-800 rounded-md m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
+                class='flex flex-col justify-center items-center h-[90%] border text-slate-700 bg-white border-stone-800 rounded-md m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
                 disabled={state.winner() || state.paused()}
                 onClick={() => clearCell()}
             >
@@ -649,33 +647,9 @@ const Timer: Component = () => {
     );
 }
 
-async function saveScore() {
-    const res = await fetch(`${baseUrl()}/sudoku/score`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token()}`,
-        },
-        body: JSON.stringify({
-            puzzle_id: state.id(),
-            seconds: state.seconds(),
-        }),
-    });
-
-    if (res.status === 401) {
-        setToken(null);
-        return;
-    }
-
-    else if (res.status !== 200) {
-        console.log('Error saving score');
-        return;
-    }
-}
-
 export const Sudoku: Component = () => {
     onMount(() => {
-        state.loadHistory();
+        state.loadGameFromServer();
 
         setInterval(() => {
             if (!state.winner() && !state.paused()) {
@@ -684,7 +658,7 @@ export const Sudoku: Component = () => {
         }, 1000);
 
         createEffect(() => {
-            saveHistory();
+            saveState();
         });
 
         createEffect(() => {
@@ -712,9 +686,8 @@ export const Sudoku: Component = () => {
                 }
 
                 if (!state.winner()) {
-                    console.log('YOU WIN!!!!');
                     state.setWinner(true);
-                    saveScore();
+                    state.saveState();
                 }
             }
         });

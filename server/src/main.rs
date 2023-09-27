@@ -41,15 +41,15 @@ struct SudokuGame {
     puzzle: String,
     solution: String,
     day: NaiveDate,
-    seconds: Option<i32>,
+    state: Option<String>,
 }
 
-async fn sudoku_today(
+async fn get_sudoku_state(
     user: User,
     State(pool): State<PgPool>,
 ) -> Result<Json<SudokuGame>, (StatusCode, String)> {
     let found_game: Option<SudokuGame> =
-        sqlx::query_as("select p.id, p.puzzle, p.solution, p.day, s.seconds from sudoku_puzzles p left join sudoku_scores s on s.puzzle_id=p.id and s.user_id = $1 where day = $2")
+        sqlx::query_as("select p.id, p.puzzle, p.solution, p.day, s.state from sudoku_puzzles p left join sudoku_scores s on s.puzzle_id=p.id and s.user_id = $1 where day = $2")
             .bind(&user.id)
             .bind(&midnight_today())
             .fetch_optional(&pool)
@@ -94,30 +94,30 @@ async fn sudoku_today(
                 puzzle: generated.puzzle.to_string(),
                 solution: generated.solution.to_string(),
                 day: midnight_today(),
-                seconds: None,
+                state: None,
             }))
         }
     }
 }
 
 #[derive(Deserialize)]
-struct SaveSudokuScoreRequest {
+struct SaveSudokuStateRequest {
     puzzle_id: Uuid,
-    seconds: i32,
+    state: Option<String>,
 }
 
-async fn save_sudoku_score(
+async fn save_sudoku_state(
     user: User,
     State(pool): State<PgPool>,
-    Json(request): Json<SaveSudokuScoreRequest>,
+    Json(request): Json<SaveSudokuStateRequest>,
 ) -> Result<(), (StatusCode, String)> {
     sqlx::query(
-        "insert into sudoku_scores (id, user_id, puzzle_id, seconds) values ($1, $2, $3, $4)",
+        "insert into sudoku_scores (id, user_id, puzzle_id, state) values ($1, $2, $3, $4) on conflict on constraint sudoku_scores_user_id_puzzle_id_key do update set state = $4",
     )
     .bind(&Uuid::new_v4())
     .bind(&user.id)
     .bind(&request.puzzle_id)
-    .bind(&request.seconds)
+    .bind(&request.state)
     .execute(&pool)
     .await
     .map_err(|e| {
@@ -135,15 +135,15 @@ struct SquarewordGame {
     id: Uuid,
     solution: String,
     day: NaiveDate,
-    guesses: Option<String>,
+    state: Option<String>,
 }
 
-async fn squareword_today(
+async fn get_squareword_state(
     user: User,
     State(pool): State<PgPool>,
 ) -> Result<Json<SquarewordGame>, (StatusCode, String)> {
     let found_game: Option<SquarewordGame> =
-        sqlx::query_as("select p.id, p.solution, p.day, s.guesses from squareword_puzzles p left join squareword_scores s on s.puzzle_id=p.id and s.user_id = $1 where p.day = $2")
+        sqlx::query_as("select p.id, p.solution, p.day, s.state from squareword_puzzles p left join squareword_scores s on s.puzzle_id=p.id and s.user_id = $1 where p.day = $2")
             .bind(&user.id)
             .bind(&midnight_today())
             .fetch_optional(&pool)
@@ -179,7 +179,7 @@ async fn squareword_today(
                 id: new_id,
                 solution: generated.to_string(),
                 day: midnight_today(),
-                guesses: None,
+                state: None,
             }))
         }
     }
@@ -188,21 +188,21 @@ async fn squareword_today(
 #[derive(Deserialize)]
 struct SaveSquarewordScoreRequest {
     puzzle_id: Uuid,
-    guesses: String,
+    state: Option<String>,
 }
 
-async fn save_squareword_score(
+async fn save_squareword_state(
     user: User,
     State(pool): State<PgPool>,
     Json(request): Json<SaveSquarewordScoreRequest>,
 ) -> Result<(), (StatusCode, String)> {
     sqlx::query(
-        "insert into squareword_scores (id, user_id, puzzle_id, guesses) values ($1, $2, $3, $4)",
+        "insert into squareword_scores (id, user_id, puzzle_id, state) values ($1, $2, $3, $4) on conflict on constraint squareword_scores_user_id_puzzle_id_key do update set state = $4",
     )
     .bind(&Uuid::new_v4())
     .bind(&user.id)
     .bind(&request.puzzle_id)
-    .bind(&request.guesses)
+    .bind(&request.state)
     .execute(&pool)
     .await
     .map_err(|e| {
@@ -421,10 +421,10 @@ async fn main() {
 
     let app = Router::new()
         .route("/ping", get(pong))
-        .route("/sudoku/today", get(sudoku_today))
-        .route("/sudoku/score", post(save_sudoku_score))
-        .route("/squareword/today", get(squareword_today))
-        .route("/squareword/score", post(save_squareword_score))
+        .route("/sudoku/state", get(get_sudoku_state))
+        .route("/sudoku/state", post(save_sudoku_state))
+        .route("/squareword/state", get(get_squareword_state))
+        .route("/squareword/state", post(save_squareword_state))
         .route("/login", post(login))
         .route("/check_auth", get(check_auth))
         .layer(CorsLayer::permissive())

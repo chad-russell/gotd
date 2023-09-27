@@ -1,3 +1,6 @@
+import { throttle } from "@solid-primitives/scheduled";
+import { setToken } from "./auth/auth";
+
 export function baseUrl(): string {
     return 'http://localhost:3001';
     // return 'https://gotd.crussell.io/api';
@@ -21,10 +24,12 @@ export function daysEqual(d1: Date | null, d2: Date | null): boolean {
     return dateAtMidnight(d1).getTime() === dateAtMidnight(d2).getTime();
 }
 
-export const breakpoints = {
-    sm: "640px",
-    md: "768px",
-    lg: "1024px",
-};
+export const throttledServerCall = throttle(async (url: string, args: any) => {
+    console.log('saving to server!');
 
+    const res = await fetch(url, args);
 
+    if (res.status === 401) {
+        setToken(null);
+    }
+}, 2000);

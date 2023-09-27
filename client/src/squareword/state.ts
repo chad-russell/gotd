@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js';
-import { baseUrl, daysEqual, getDay } from '../util';
-import { setToken, token } from '../auth/auth';
+import { baseUrl, daysEqual, getDay, throttledServerCall } from '../util';
+import { token } from '../auth/auth';
 
 export const [id, setId] = createSignal<string | null>(null);
 export const [loading, setLoading] = createSignal(false);
@@ -20,38 +20,13 @@ export function clearAll() {
     setWinner(false);
 }
 
-export async function loadHistory() {
-    const fromStorage = localStorage.getItem('squareword');
-
-    if (fromStorage) {
-        let { id, puzzleDay, solution, guess, guessHistory, winner } = JSON.parse(fromStorage);
-
-        puzzleDay = new Date(puzzleDay);
-        solution = solution?.map((s: string) => s.toUpperCase());
-
-        // If the save is from today, we can use it
-        if (daysEqual(puzzleDay, getDay())) {
-            setWinner(winner);
-            setId(id);
-            setSolution(solution);
-            setGuess(guess);
-            setGuessHistory(guessHistory);
-            setPuzzleDay(puzzleDay);
-
-            return;
-        }
-    }
-
-    await loadGameFromServer();
-}
-
 export async function loadGameFromServer() {
     if (loading()) {
         return;
     }
     setLoading(true);
 
-    const res = await fetch(`${baseUrl()}/squareword/today`, {
+    const res = await fetch(`${baseUrl()}/squareword/state`, {
         headers: {
             'Authorization': `Bearer ${token()}`
         }
@@ -59,6 +34,13 @@ export async function loadGameFromServer() {
     const resJson = await res.json();
 
     const sol = resJson.solution;
+    setSolution([
+        sol.slice(0, 5).toUpperCase(),
+        sol.slice(5, 10).toUpperCase(),
+        sol.slice(10, 15).toUpperCase(),
+        sol.slice(15, 20).toUpperCase(),
+        sol.slice(20, 25).toUpperCase(),
+    ]);
 
     setId(resJson.id);
 
@@ -66,39 +48,26 @@ export async function loadGameFromServer() {
     let date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
     setPuzzleDay(new Date(date));
 
-    if (resJson.guesses != null) {
-        let guesses = [];
-        while (resJson.guesses.length > 0) {
-            guesses.push(resJson.guesses.slice(0, 5));
-            resJson.guesses = resJson.guesses.slice(5);
-        }
-
-        setWinner(true);
-        setGuessHistory(guesses);
+    if (resJson.state != null) {
+        const parsed = JSON.parse(resJson.state);
+        setGuess(parsed.guess);
+        setGuessHistory(parsed.guessHistory);
+        setWinner(parsed.winner);
     }
-
-    setSolution([
-        sol.slice(0, 5),
-        sol.slice(5, 10),
-        sol.slice(10, 15),
-        sol.slice(15, 20),
-        sol.slice(20, 25),
-    ]);
-
-    localStorage.setItem('squareword', JSON.stringify({
-        'id': id(),
-        'solution': solution(),
-        'guess': [],
-        'guessHistory': guessHistory(),
-        'puzzleDay': puzzleDay(),
-        'winner': winner(),
-    }));
 
     setLoading(false);
 }
 
-export async function saveScore() {
-    const res = await fetch(`${baseUrl()}/squareword/score`, {
+export async function saveState() {
+    if (!daysEqual(puzzleDay(), getDay())) {
+        await loadGameFromServer();
+    }
+
+    if (id() === null) {
+        return;
+    }
+
+    throttledServerCall(`${baseUrl()}/squareword/state`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -106,17 +75,14 @@ export async function saveScore() {
         },
         body: JSON.stringify({
             puzzle_id: id(),
-            guesses: guessHistory().join(''),
+            state: JSON.stringify({
+                'id': id(),
+                'solution': solution(),
+                'guess': guess(),
+                'guessHistory': guessHistory(),
+                'puzzleDay': puzzleDay(),
+                'winner': winner(),
+            }),
         }),
     });
-
-    if (res.status === 401) {
-        setToken(null);
-        return;
-    }
-
-    else if (res.status !== 200) {
-        console.log('Error saving score');
-        return;
-    }
 }

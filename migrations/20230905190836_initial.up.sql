@@ -22,7 +22,7 @@ create table if not exists "sudoku_scores" (
     "id" uuid primary key,
     "user_id" uuid not null,
     "puzzle_id" uuid not null,
-    "seconds" int not null,
+    "state" text,
 
     foreign key ("user_id") references "users" ("id"),
     foreign key ("puzzle_id") references "sudoku_puzzles" ("id"),
@@ -42,7 +42,7 @@ create table if not exists "squareword_scores" (
     "id" uuid primary key,
     "user_id" uuid not null,
     "puzzle_id" uuid not null,
-    "guesses" text not null,
+    "state" text,
 
     foreign key ("user_id") references "users" ("id"),
     foreign key ("puzzle_id") references "squareword_puzzles" ("id"),

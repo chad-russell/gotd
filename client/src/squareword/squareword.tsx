@@ -2,7 +2,6 @@ import { createSignal, type Component, createEffect, onMount, Show, For } from '
 import { FiDelete } from 'solid-icons/fi';
 import { FaSolidCheck } from 'solid-icons/fa';
 import { DICTIONARY } from './dictionary';
-import { daysEqual, getDay } from '../util';
 import { Portal } from 'solid-js/web';
 import * as state from './state';
 
@@ -17,10 +16,6 @@ const [animatedRow2, setAnimatedRow2] = createSignal<boolean>(false);
 const [animatedRow3, setAnimatedRow3] = createSignal<boolean>(false);
 const [animatedRow4, setAnimatedRow4] = createSignal<boolean>(false);
 const [animatedRow5, setAnimatedRow5] = createSignal<boolean>(false);
-
-function isCorrectDay() {
-    return daysEqual(state.puzzleDay(), getDay());
-}
 
 function correctLetter(row: number, col: number) {
     return state.solution()![row - 1][col];
@@ -98,22 +93,6 @@ function winnerRow(row: number, col: number): boolean {
     }
 
     return false;
-}
-
-async function saveHistory() {
-    if (!isCorrectDay()) {
-        localStorage.removeItem('squareword');
-        await state.loadGameFromServer();
-    }
-
-    localStorage.setItem('squareword', JSON.stringify({
-        'id': state.id(),
-        'solution': state.solution(),
-        'guess': state.guess(),
-        'guessHistory': state.guessHistory(),
-        'puzzleDay': state.puzzleDay(),
-        'winner': state.winner(),
-    }));
 }
 
 function notifyGuessError() {
@@ -623,14 +602,15 @@ export const Squareword: Component = () => {
     const [pendingWinner, setPendingWinner] = createSignal<boolean>(false);
 
     onMount(() => {
-        state.loadHistory();
+        state.loadGameFromServer();
 
         createEffect(() => {
-            saveHistory();
+            if (state.loading()) { return; }
+            state.saveState();
         });
 
         createEffect(() => {
-            if (state.winner() || pendingWinner()) {
+            if (state.loading() || state.winner() || pendingWinner()) {
                 return;
             }
 
@@ -659,8 +639,8 @@ export const Squareword: Component = () => {
             setPendingWinner(true);
 
             setTimeout(() => {
-                state.saveScore();
                 state.setWinner(true);
+                state.saveState();
             }, 1200);
         });
     });
