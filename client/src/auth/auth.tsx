@@ -61,20 +61,22 @@ const LoginButton: Component = () => {
 
         setToken(text);
 
-        squarewordState.loadHistory();
-        sudokuState.loadHistory();
+        squarewordState.loadGameFromServer();
+        sudokuState.loadGameFromServer();
     }
 
     onMount(() => {
-        google.accounts.id.initialize({
-            client_id: "1012807370880-93eor5h650abjrreks9ut5f5dp5tv67q.apps.googleusercontent.com",
-            callback: handleCredentialResponse
-        });
-        google.accounts.id.renderButton(
-            document.getElementById("buttonDiv"),
-            { theme: "outline", size: "large" }  // customization attributes
-        );
-        google.accounts.id.prompt(); // also display the One Tap dialog
+        window.onload = () => {
+            google.accounts.id.initialize({
+                client_id: "1012807370880-93eor5h650abjrreks9ut5f5dp5tv67q.apps.googleusercontent.com",
+                callback: handleCredentialResponse
+            });
+            google.accounts.id.renderButton(
+                document.getElementById("buttonDiv"),
+                { theme: "outline", size: "large" }  // customization attributes
+            );
+            google.accounts.id.prompt(); // also display the One Tap dialog
+        };
     });
 
     return btn;
