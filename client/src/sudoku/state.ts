@@ -44,6 +44,8 @@ export async function saveState() {
         return;
     }
 
+    const historyLast5 = (history() ?? []).slice(-5);
+
     throttledServerCall(`${baseUrl()}/sudoku/state`, {
         method: 'POST',
         headers: {
@@ -57,7 +59,7 @@ export async function saveState() {
                 'paused': paused(),
                 'seconds': seconds(),
                 'inputStyle': inputStyle(),
-                'history': history(),
+                'history': historyLast5,
                 'puzzleDay': puzzleDay(),
                 'solution': solution(),
                 'winner': winner(),
