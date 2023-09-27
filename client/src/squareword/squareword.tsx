@@ -694,7 +694,7 @@ export const Squareword: Component = () => {
 
     return (
         <Show when={state.id() && !state.loading()} fallback={<div>Loading...</div>}>
-            <div class='h-[75vh] md:h-[90vh] flex flex-col justify-center items-center m-1'>
+            <div class='h-[75vh] sm:h-[90vh] flex flex-col justify-center items-center m-1'>
                 <div class='flex flex-col max-h-[90vh] max-w-[60vh] w-full'>
                     <SquarewordBoard />
                     <SquarewordKeyboard />
