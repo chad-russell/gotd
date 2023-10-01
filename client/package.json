@@ -23,8 +23,9 @@
     "@solid-primitives/scheduled": "^1.4.1",
     "@solidjs/router": "^0.8.3",
     "immutable": "^4.3.2",
+    "jwt-decode": "3.1.2",
     "solid-icons": "^1.0.11",
     "solid-js": "^1.7.6",
-    "jwt-decode": "3.1.2"
+    "solid-toast": "^0.5.0"
   }
 }

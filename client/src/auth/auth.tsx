@@ -84,7 +84,7 @@ const LoginButton: Component = () => {
 
 export const LoginScreen: Component = () => {
     return (
-        <div class='flex flex-col justify-center items-center h-screen'>
+        <div class='flex flex-col justify-center items-center h-full'>
             <h2 class='text-3xl md:text-4xl lg:text-5xl text-center my-2 h-[7vh] select-none'>
                 Welcome to GOTD!
             </h2>

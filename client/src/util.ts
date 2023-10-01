@@ -1,7 +1,8 @@
-import { throttle } from "@solid-primitives/scheduled";
+// import { throttle } from "@solid-primitives/scheduled";
 import { setToken } from "./auth/auth";
 
 export function baseUrl(): string {
+    // return 'https://mpro.crussell.io:3001';
     // return 'http://localhost:3001';
     return 'https://gotd.crussell.io/api';
 }
@@ -24,12 +25,24 @@ export function daysEqual(d1: Date | null, d2: Date | null): boolean {
     return dateAtMidnight(d1).getTime() === dateAtMidnight(d2).getTime();
 }
 
-export const throttledServerCall = throttle(async (url: string, args: any) => {
-    console.log('saving to server!');
+// export const throttledServerCall = throttle(async (url: string, args: any) => {
+//     const res = await fetch(url, args);
+//
+//     if (res.status === 401) {
+//         setToken(null);
+//     }
+// }, 2000);
 
+export const throttledServerCall = async (url: string, args: any) => {
     const res = await fetch(url, args);
 
     if (res.status === 401) {
         setToken(null);
     }
-}, 2000);
+};
+
+export function formatTime(seconds: number): string {
+    const minutes = Math.floor(seconds / 60);
+    const secondsLeft = seconds % 60;
+    return `${minutes}:${secondsLeft.toString().padStart(2, '0')} `;
+}

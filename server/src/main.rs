@@ -382,15 +382,47 @@ async fn check_auth(user: User) -> Result<String, (StatusCode, String)> {
     Ok(format!("{:?}", user))
 }
 
+async fn pong() -> String {
+    return "pong\n".to_string();
+}
+
+#[derive(Serialize)]
+struct LeaderboardUser {
+    name: String,
+    picture: Option<String>,
+    sudoku_score: i32,
+    squareword_score: i32,
+}
+
+#[derive(Serialize)]
+struct LeaderboardResponse {
+    users: Vec<LeaderboardUser>,
+}
+
+async fn leaderboard() -> Result<Json<LeaderboardResponse>, (StatusCode, String)> {
+    Ok(Json(LeaderboardResponse {
+        users: vec![
+            LeaderboardUser {
+                name: "Test User".to_string(),
+                picture: None,
+                sudoku_score: 150,
+                squareword_score: 300,
+            },
+            LeaderboardUser {
+                name: "Test User 2".to_string(),
+                picture: None,
+                sudoku_score: 200,
+                squareword_score: 85,
+            },
+        ],
+    }))
+}
+
 #[derive(Parser, Debug)]
 struct Args {
     /// DB Hostname
     #[arg(short, long, default_value = "localhost")]
     db_host: String,
-}
-
-async fn pong() -> String {
-    return "pong\n".to_string();
 }
 
 #[tokio::main]
@@ -426,6 +458,7 @@ async fn main() {
         .route("/squareword/state", get(get_squareword_state))
         .route("/squareword/state", post(save_squareword_state))
         .route("/login", post(login))
+        .route("/leaderboard", get(leaderboard))
         .route("/check_auth", get(check_auth))
         .layer(CorsLayer::permissive())
         .with_state(pool);

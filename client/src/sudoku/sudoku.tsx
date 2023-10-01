@@ -1,20 +1,18 @@
 import { createSignal, type Component, Show, onMount, createEffect } from 'solid-js';
-import { IoArrowUndoOutline } from 'solid-icons/io'
+import { IoArrowUndoOutline, IoShareOutline } from 'solid-icons/io'
 import { TbNumbers } from 'solid-icons/tb'
 import { FiDelete } from 'solid-icons/fi'
 import { BsPatchQuestionFill, BsPauseCircle, BsPlayCircle } from 'solid-icons/bs'
 import { BsPencil } from 'solid-icons/bs'
-import { daysEqual, getDay } from '../util';
+import toast from 'solid-toast';
+import { daysEqual, formatTime, getDay } from '../util';
 import * as state from './state';
-
-// const easyPuzzle = {
-//     puzzle: "42897516337612894595136427881975362426784153953429681714258739678361945269543278-",
-//     solution: "428975163376128945951364278819753624267841539534296817142587396783619452695432781",
-//     difficulty: "medium",
-// };
+import { createMediaQuery } from "@solid-primitives/media";
 
 const [noErrAnim, setNoErrAnim] = createSignal(false);
 const [winnerColorChange, setWinnerColorChange] = createSignal(0);
+
+const isSmall = createMediaQuery("(max-width: 640px)");
 
 function isCorrectDay() {
     return daysEqual(state.puzzleDay(), getDay());
@@ -447,6 +445,14 @@ const SudokuCell: Component<{ n: number }> = (props) => {
         return curGameState().cells[props.n].value
     }
 
+    function fontSize(): string {
+        if (isSmall()) {
+            return '3vh';
+        }
+
+        return 'min(4vh, 8vw)';
+    }
+
     return (
         <div
             class={`w-full h-full border-[0.5px] border-slate-300 aspect-square text-center flex flex-col items-center overflow-hidden justify-center ${bgStyle()} ${radiusStyle()}`}
@@ -455,7 +461,7 @@ const SudokuCell: Component<{ n: number }> = (props) => {
             }}
         >
             <Show when={hasValue() || state.paused()} fallback={<Notes n={props.n} />}>
-                <span style='font-size: min(4vh, 8vw)' class={`z-10 select-none ${textStyle()} transition ease-in-out duration-100`}>
+                <span style={`font-size: ${fontSize()}`} class={`z-10 select-none ${textStyle()} transition ease-in-out duration-100`}>
                     {value()}
                 </span>
             </Show>
@@ -497,10 +503,18 @@ const SudokuInputNumber: Component<{ n: number }> = (props) => {
         return 'hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200 text-slate-600 py-1 lg:py-5 border border-stone-300';
     }
 
+    function fontSize(): string {
+        if (isSmall()) {
+            return '2.8vh';
+        }
+
+        return 'min(4vh, 8vw)';
+    }
+
     return (
         <button
             disabled={state.winner() || allFilled(props.n)}
-            style='font-size: min(4vh, 8vw)'
+            style={`font-size: ${fontSize()}`}
             class={`text-center flex flex-col items-center justify-center m-1 rounded-xl select-none ${style()}`}
             onClick={() => inputNumber(props.n)}
         >
@@ -511,7 +525,7 @@ const SudokuInputNumber: Component<{ n: number }> = (props) => {
 
 const SudokuNumberPad: Component = () => {
     return (
-        <div class='grid grid-cols-3 grid-rows-3 pt-2 mb-2 w-full h-[50%] lg:w-[100%] lg:max-h-[70%]'>
+        <div class='grid grid-cols-3 grid-rows-3 pt-2 mb-2 w-full lg:w-[100%] lg:max-h-[70%]'>
             <SudokuInputNumber n={1} />
             <SudokuInputNumber n={2} />
             <SudokuInputNumber n={3} />
@@ -526,8 +540,16 @@ const SudokuNumberPad: Component = () => {
 }
 
 const SudokuBoard: Component = () => {
+    function style(): string {
+        if (isSmall()) {
+            return 'calc(min(50dvh, 90vw))';
+        }
+
+        return `calc(min(45dvh, 85vw) + 12vw)`;
+    }
+
     return (
-        <div style='height: calc(min(50vh, 85vw) + 10vw); width: calc(min(50vh, 85vw) + 10vw);' class='aspect-square grid grid-cols-3 grid-rows-3'>
+        <div style={`height: ${style()}; width: ${style()};`} class='grid grid-cols-3 grid-rows-3'>
             <Sudoku3x3 n={0} border={['b', 'r']} />
             <Sudoku3x3 n={3} border={['b']} />
             <Sudoku3x3 n={6} border={['b', 'l']} />
@@ -550,20 +572,28 @@ const InputStyle: Component = () => {
         return 'transform: translate(40%, -60%) scale(0, 0)';
     }
 
+    function fontSize(): string {
+        if (isSmall()) {
+            return '2vh';
+        }
+
+        return '2.5vh';
+    }
+
     return (
         <div
             class='col-span-1 flex flex-col items-center justify-center h-[90%] border text-slate-700 bg-white border-stone-800 rounded-md py-1 m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
             onClick={() => swapInputStyle()}
         >
             <button
-                style={`font-size: min(2.5vh, 5vw); ${transform('number')}`}
+                style={`font-size: ${fontSize()}; ${transform('number')}`}
                 class='flex flex-col justify-end items-center absolute transition-all'
             >
                 <TbNumbers color="rgb(47, 41, 36)" />
                 <span>Number</span>
             </button>
             <button
-                style={`font-size: min(2.5vh, 5vw); ${transform('note')}`}
+                style={`font-size: ${fontSize()}; ${transform('note')}`}
                 class='flex flex-col justify-end items-center relative transition-all'
             >
                 <BsPencil color="rgb(47, 41, 36)" />
@@ -573,11 +603,41 @@ const InputStyle: Component = () => {
     )
 };
 
-const SudokuIcons: Component = () => {
+const ShareButton: Component = () => {
     return (
-        <div class='grid grid-cols-4 select-none h-[min(60px, 10vh)] w-full'>
+        <div class='w-full flex flex-row justify-center'>
             <button
-                style='font-size: min(2.5vh, 5vw)'
+                style={`font-size: 2.5vh`}
+                class='flex flex-row justify-center items-center h-[min(60px, 10vh)] py-2 md:py-4 mt-4 md:mt-2 px-10 border border-stone-800 text-slate-700 bg-white rounded-md m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
+                onClick={() => {
+                    navigator.clipboard.writeText(`${state.formatScore()}\nhttps://gotd.crussell.io/`);
+                    toast.success('Copied to clipboard', { duration: 2000 });
+                }}
+            >
+                <IoShareOutline class='mr-3' color="rgb(47, 41, 36)" />
+                <span>Share</span>
+            </button>
+        </div>
+    );
+};
+
+const SudokuIcons: Component = () => {
+    if (state.winner()) {
+        return <ShareButton />;
+    }
+
+    function fontSize(): string {
+        if (isSmall()) {
+            return '2vh';
+        }
+
+        return '2.5vh';
+    }
+
+    return (
+        <div class='grid grid-cols-4 select-none w-full'>
+            <button
+                style={`font-size: ${fontSize()}`}
                 class='flex flex-col justify-center items-center h-[90%] border border-stone-800 text-slate-700 bg-white rounded-md m-1 hover:bg-none sm:hover:bg-red-100 active:bg-red-200 sm:active:bg-red-200'
                 disabled={state.winner() || state.paused() || state.history()?.length === 1}
                 onClick={() => undo()}
@@ -586,7 +646,7 @@ const SudokuIcons: Component = () => {
                 <span>Undo</span>
             </button>
             <button
-                style='font-size: min(2.5vh, 5vw)'
+                style={`font-size: ${fontSize()}`}
                 class='flex flex-col justify-center items-center h-[90%] border text-slate-700 bg-white border-stone-800 rounded-md m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
                 disabled={state.winner() || state.paused()}
                 onClick={() => clearCell()}
@@ -597,7 +657,8 @@ const SudokuIcons: Component = () => {
             <InputStyle />
             <button
                 disabled={state.winner() || noErrAnim() || state.paused()}
-                style='font-size: min(2.5vh, 5vw)' class='flex flex-col justify-center items-center h-[90%] border text-slate-700 bg-white border-stone-800 rounded-md m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
+                style={`font-size: ${fontSize()}`}
+                class='flex flex-col justify-center items-center h-[90%] border text-slate-700 bg-white border-stone-800 rounded-md m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
                 onClick={() => checkCells()}
             >
                 <BsPatchQuestionFill color="rgb(47, 41, 36)" />
@@ -605,15 +666,9 @@ const SudokuIcons: Component = () => {
             </button>
         </div>
     );
-}
+};
 
 const Timer: Component = () => {
-    function formatTime(seconds: number): string {
-        const minutes = Math.floor(seconds / 60);
-        const secondsLeft = seconds % 60;
-        return `${minutes}:${secondsLeft.toString().padStart(2, '0')} `;
-    }
-
     function time() {
         if (state.winner()) {
             return 'Final Time:';
@@ -623,11 +678,14 @@ const Timer: Component = () => {
     }
 
     return (
-        <div class='flex flex-row items-center justify-center'>
+        <div class='flex flex-row h-[8dvh] md:h-[10dvh] items-center justify-center'>
             <div
-                class='flex flex-row items-center py-1 px-4 my-1 text-lg md:text-xl lg:text-2xl text-center text-blue-600 bg-white border border-stone-800 rounded-md shadow-lg'
+                class={`flex flex-row items-center py-1 px-4 md:my-1 text-lg md:text-xl lg:text-2xl text-center text-blue-600 bg-white border border-stone-800 rounded-md shadow-lg`}
                 onClick={() => {
-                    if (state.winner()) { return; }
+                    if (state.winner()) {
+                        return;
+                    }
+
                     state.setPaused(!state.paused());
                 }}
             >
@@ -687,7 +745,7 @@ export const Sudoku: Component = () => {
 
                 if (!state.winner()) {
                     state.setWinner(true);
-                    state.saveState();
+                    state.saveState(true);
                 }
             }
         });
@@ -779,14 +837,16 @@ export const Sudoku: Component = () => {
     return (
         <Show when={state.id() != null && state.history() !== null && !state.loading()} fallback={<div>Loading...</div>}>
             <div class='h-full w-full flex flex-col items-center lg:flex-row lg:justify-center p-1'>
-                <div class='flex flex-col w-full lg:h-[80%] items-center justify-start xl:mx-8 xl:w-[42%]'>
+                <div class='flex flex-col w-full max-h-[60dvh] md:max-h-full overflow-hidden lg:h-[80%] items-center justify-start xl:mx-8 xl:w-[42%]'>
                     <Timer />
                     <SudokuBoard />
                 </div>
-                <div class='w-full h-full flex flex-row items-center justify-center xl:w-[30%]'>
+                <div class='w-full max-h-[32dvh] md:max-h-full overflow-hidden flex flex-row items-center justify-center xl:w-[30%]'>
                     <div class='w-full h-full lg:h-[80%] lg:flex lg:flex-col lg:items-center lg:justify-center'>
                         <SudokuIcons />
-                        <SudokuNumberPad />
+                        <Show when={!state.winner()}>
+                            <SudokuNumberPad />
+                        </Show>
                     </div>
                 </div>
             </div>

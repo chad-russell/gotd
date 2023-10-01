@@ -34,7 +34,7 @@ export const TopBar: Component<{ title: string }> = (props) => {
     }
 
     return (
-        <div class='w-full h-16 bg-blue-500 grid grid-cols-3'>
+        <div class='w-full h-[9dvh] md:h-16 bg-blue-500 grid grid-cols-3 z-50'>
             <Show when={props.title !== 'GOTD'} fallback={<div />}>
                 <div class='flex items-center justify-start'>
                     <FiHome class='text-white m-3 w-7 h-7' onClick={() => window.location.href = '/'} />

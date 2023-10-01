@@ -3,13 +3,16 @@ import { Router, Route, Routes } from "@solidjs/router";
 import { Sudoku } from './sudoku/sudoku';
 import { LoginScreen, loggedIn, token, setToken } from './auth/auth';
 import { Squareword } from './squareword/squareword';
+import { Leaderboard } from './leaderboard/leaderboard';
 import * as squarewordState from './squareword/state';
 import * as sudokuState from './sudoku/state';
 import { TopBar } from './common/topBar';
+import toast, { Toaster } from 'solid-toast';
+import { IoShareOutline } from 'solid-icons/io';
 
 const SudokuHome: Component = () => {
     return (
-        <div class='h-full w-full flex flex-col justify-between items-center'>
+        <div class='h-full max-h-[100dvh] w-full flex flex-col justify-between items-center'>
             <TopBar title={'Sudoku'} />
             <Sudoku />
         </div>
@@ -18,9 +21,18 @@ const SudokuHome: Component = () => {
 
 const SquarewordHome: Component = () => {
     return (
-        <div class='h-full w-full flex-col justify-between items-center'>
+        <div class='max-h-[100dvh] w-full flex-col justify-between items-center'>
             <TopBar title={'Squareword'} />
             <Squareword />
+        </div>
+    );
+};
+
+const LeaderboardHome: Component = () => {
+    return (
+        <div class='h-full w-full flex-col justify-between items-center'>
+            <TopBar title={'🏆 Leaderboard 🏆'} />
+            <Leaderboard />
         </div>
     );
 };
@@ -144,8 +156,8 @@ const GameCard: Component<{ title: string, href: string, winner: boolean }> = (p
              grid grid-cols-4 grid-rows-1
              lg:flex lg:flex-col lg:justify-around lg:items-center
              text-slate-800 text-3xl sm:text-4xl md:text-4xl lg:text-4xl lg:text-center
-             ${dynamicClasses()}
              transition ease-out hover:-translate-y-1 hover:scale-110 duration-200
+             ${dynamicClasses()}
              `
         }>
             <div class='col-span-3 lg:col-span-1 flex flex-col justify-center'>{props.title}</div>
@@ -154,15 +166,36 @@ const GameCard: Component<{ title: string, href: string, winner: boolean }> = (p
     );
 };
 
+const ShareButton: Component = () => {
+    return (
+        <button
+            style='font-size: min(2.5vh, 5vw)'
+            class='flex flex-row justify-center items-center h-[min(60px, 10vh)] py-4 px-10 border border-stone-800 text-slate-700 bg-white rounded-md m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
+            onClick={() => {
+                navigator.clipboard.writeText(`${sudokuState.formatScore()}\n${squarewordState.formatScore()}\nhttps://gotd.crussell.io/`);
+                toast.success('Copied to clipboard', { duration: 2000 });
+            }}
+        >
+            <IoShareOutline class='mr-3' color="rgb(47, 41, 36)" />
+            <span>Share</span>
+        </button>
+    );
+}
+
 const Home: Component = () => {
     return (
         <div class='w-full h-full flex flex-col justify-start items-center'>
             <TopBar title='GOTD' />
 
             <div class='w-full h-full flex flex-col justify-center items-center'>
-                <div class='flex flex-col lg:flex-row'>
-                    <GameCard winner={sudokuState.winner()} title='Sudoku' href='/sudoku' />
-                    <GameCard winner={squarewordState.winner()} title='Squareword' href='/squareword' />
+                <div class='flex flex-col items-center'>
+                    <div class='flex flex-col lg:flex-row'>
+                        <GameCard winner={sudokuState.winner()} title='Sudoku' href='/sudoku' />
+                        <GameCard winner={squarewordState.winner()} title='Squareword' href='/squareword' />
+                    </div>
+                    <Show when={sudokuState.winner() && squarewordState.winner()}>
+                        <ShareButton />
+                    </Show>
                 </div>
             </div>
         </div>
@@ -191,13 +224,32 @@ const App: Component = () => {
 
     return (
         <Show when={loggedIn()} fallback={<LoginScreen />}>
-            <Router>
-                <Routes>
-                    <Route path="/" component={Home} />
-                    <Route path="/sudoku" component={SudokuHome} />
-                    <Route path="/squareword" component={SquarewordHome} />
-                </Routes>
-            </Router>
+            <div class='w-full h-full max-h-[100dvh]'>
+                <Toaster
+                    position="top-center"
+                    // Spacing between each toast in pixels
+                    gutter={8}
+                    containerClassName=""
+                    containerStyle={{}}
+                    toastOptions={{
+                        // Define default options that each toast will inherit. Will be overwritten by individual toast options
+                        className: '',
+                        duration: 5000,
+                        style: {
+                            background: '#363636',
+                            color: '#fff',
+                        },
+                    }}
+                />
+                <Router>
+                    <Routes>
+                        <Route path="/" component={Home} />
+                        <Route path="/sudoku" component={SudokuHome} />
+                        <Route path="/squareword" component={SquarewordHome} />
+                        <Route path="/leaderboard" component={LeaderboardHome} />
+                    </Routes>
+                </Router>
+            </div>
         </Show >
     );
 };

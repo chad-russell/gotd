@@ -4,6 +4,8 @@ import { FaSolidCheck } from 'solid-icons/fa';
 import { DICTIONARY } from './dictionary';
 import { Portal } from 'solid-js/web';
 import * as state from './state';
+import toast from 'solid-toast';
+import { IoShareOutline } from 'solid-icons/io';
 
 const [showGuess, setShowGuess] = createSignal<boolean>(false);
 
@@ -169,6 +171,24 @@ function enterGuess() {
         setAnimatedRow5(false);
     }, 1001);
 }
+
+const ShareButton: Component = () => {
+    return (
+        <div class='w-full flex flex-row justify-center'>
+            <button
+                style={`font-size: 2.5vh`}
+                class='flex flex-row justify-center items-center h-[min(60px, 10vh)] py-2 md:py-4 mt-4 md:mt-2 px-10 border border-stone-800 text-slate-700 bg-white rounded-md m-1 hover:bg-none sm:hover:bg-blue-100 active:bg-blue-200 sm:active:bg-blue-200'
+                onClick={() => {
+                    navigator.clipboard.writeText(`${state.formatScore()}\nhttps://gotd.crussell.io/`);
+                    toast.success('Copied to clipboard', { duration: 2000 });
+                }}
+            >
+                <IoShareOutline class='mr-3' color="rgb(47, 41, 36)" />
+                <span>Share</span>
+            </button>
+        </div>
+    );
+};
 
 const SquarewordKeyboard: Component = () => {
     return (
@@ -587,10 +607,14 @@ const GuessModal = () => {
             class='fixed inset-x-0 inset-y-0 flex flex-col justify-center items-center bg-stone-800 bg-opacity-50'
             onClick={() => setShowGuess(false)}
         >
-            <div class='w-1/2 max-w-[200px] h-1/2 py-2 bg-blue-300 p-30 flex flex-col items-center justify-center rounded-md' onClick={(e) => { e.stopPropagation() }}>
-                <div class='overflow-scroll w-full flex flex-col items-center'>
+            <div class='w-1/2 max-w-[200px] h-1/2 py-2 bg-blue-300 p-30 flex flex-col items-center justify-start rounded-md' onClick={(e) => { e.stopPropagation() }}>
+                <div class='overflow-scroll w-full flex flex-col items-center px-3'>
                     <For each={state.guessHistory()}>
-                        {(guess) => <div class='text-2xl my-2'>{guess.toUpperCase()}</div>}
+                        {(guess) => <div class='text-2xl text-stone-900 my-2 grid grid-cols-5 w-full'>
+                            <For each={guess.toUpperCase().split('')}>
+                                {(g) => <div class='bg-white border border-stone-800 rounded aspect-square flex flex-row items-center justify-center m-[1px]'>{g}</div>}
+                            </For>
+                        </div>}
                     </For>
                 </div>
             </div>
@@ -677,7 +701,9 @@ export const Squareword: Component = () => {
             <div class='h-full flex flex-col justify-start items-center p-3'>
                 <div class='flex flex-col max-h-[90vh] max-w-[60vh] w-full'>
                     <SquarewordBoard />
-                    <SquarewordKeyboard />
+                    <Show when={!state.winner()} fallback={<ShareButton />}>
+                        <SquarewordKeyboard />
+                    </Show>
                 </div>
             </div>
             <Show when={showGuess()}>

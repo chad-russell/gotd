@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js';
 import { baseUrl, daysEqual, getDay, throttledServerCall } from '../util';
-import { token } from '../auth/auth';
+import { setToken, token } from '../auth/auth';
 
 export const [id, setId] = createSignal<string | null>(null);
 export const [loading, setLoading] = createSignal(false);
@@ -67,22 +67,40 @@ export async function saveState() {
         return;
     }
 
-    throttledServerCall(`${baseUrl()}/squareword/state`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token()}`,
-        },
-        body: JSON.stringify({
-            puzzle_id: id(),
-            state: JSON.stringify({
-                'id': id(),
-                'solution': solution(),
-                'guess': guess(),
-                'guessHistory': guessHistory(),
-                'puzzleDay': puzzleDay(),
-                'winner': winner(),
-            }),
+    const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token()}`,
+    };
+
+    const body = JSON.stringify({
+        puzzle_id: id(),
+        state: JSON.stringify({
+            'id': id(),
+            'guess': guess(),
+            'guessHistory': guessHistory(),
+            'puzzleDay': puzzleDay(),
+            'winner': winner(),
         }),
     });
+
+    if (winner()) {
+        console.log('saving to server!');
+        await fetch(`${baseUrl()}/squareword/state`, {
+            method: 'POST',
+            headers: headers,
+            body: body,
+        });
+    }
+    else {
+        throttledServerCall(`${baseUrl()}/squareword/state`, {
+            method: 'POST',
+            headers: headers,
+            body: body,
+        });
+    }
 }
+
+export function formatScore(): string {
+    return `Squareword: ${guessHistory().length} guesses`;
+}
+
