@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js";
-import { baseUrl, formatTime, throttledServerCall } from "../util";
+import { baseUrl, daysEqual, formatTime, getDay } from "../util";
 import { token } from "../auth/auth";
 
 export const [id, setId] = createSignal<string | null>(null);
@@ -39,8 +39,16 @@ export type History = GameState[];
 
 export const [history, setHistory] = createSignal<History | null>(null, { equals: false });
 
-export async function saveState(immediate = false) {
+export async function saveState() {
+    if (!daysEqual(puzzleDay(), getDay())) {
+        await loadGameFromServer();
+    }
+
     if (id() === null) {
+        return;
+    }
+
+    if (loading()) {
         return;
     }
 
@@ -60,25 +68,15 @@ export async function saveState(immediate = false) {
             'inputStyle': inputStyle(),
             'history': historyLast5,
             'puzzleDay': puzzleDay(),
-            'winner': winner(),
-        })
+        }),
+        winner: winner(),
     });
 
-    if (immediate && !loading()) {
-        console.log('saving sudoku now: ', JSON.parse(JSON.parse(body).state));
-        await fetch(`${baseUrl()}/sudoku/state`, {
-            method: 'POST',
-            headers: headers,
-            body: body
-        });
-    }
-    else if (!winner() && !loading()) {
-        throttledServerCall(`${baseUrl()}/sudoku/state`, {
-            method: 'POST',
-            headers: headers,
-            body: body
-        });
-    }
+    await fetch(`${baseUrl()}/sudoku/state`, {
+        method: 'POST',
+        headers: headers,
+        body: body
+    });
 }
 
 export async function loadGameFromServer() {
@@ -87,7 +85,6 @@ export async function loadGameFromServer() {
     }
     setLoading(true);
 
-    // read from the `/sudoku/today` endpoint of the server
     let res = await fetch(`${baseUrl()}/sudoku/state`, {
         headers: {
             'Authorization': `Bearer ${token()}`
@@ -100,14 +97,14 @@ export async function loadGameFromServer() {
     setPuzzleDay(date);
 
     if (p.state !== null) {
-        let { id, seconds, paused, history, winner } = JSON.parse(p.state);
+        let { id, seconds, paused, history } = JSON.parse(p.state);
 
         setId(id);
         setSeconds(seconds);
         setPaused(paused);
         setHistory(history);
         setSolution(p.solution);
-        setWinner(winner);
+        setWinner(p.winner);
     } else {
         const cells: CellState[] = p.puzzle.split('').map((c: string) => {
             if (c === '-') {
@@ -137,12 +134,6 @@ export async function loadGameFromServer() {
         setId(p.id);
 
         setSeconds(0);
-
-        if (p.seconds != null) {
-            setSeconds(p.seconds);
-            setWinner(true);
-            setPaused(true);
-        }
     }
 
     setLoading(false);

@@ -5,7 +5,7 @@ import { FiDelete } from 'solid-icons/fi'
 import { BsPatchQuestionFill, BsPauseCircle, BsPlayCircle } from 'solid-icons/bs'
 import { BsPencil } from 'solid-icons/bs'
 import toast from 'solid-toast';
-import { daysEqual, formatTime, getDay } from '../util';
+import { formatTime } from '../util';
 import * as state from './state';
 import { createMediaQuery } from "@solid-primitives/media";
 
@@ -13,10 +13,6 @@ const [noErrAnim, setNoErrAnim] = createSignal(false);
 const [winnerColorChange, setWinnerColorChange] = createSignal(0);
 
 const isSmall = createMediaQuery("(max-width: 640px)");
-
-function isCorrectDay() {
-    return daysEqual(state.puzzleDay(), getDay());
-}
 
 function updateWinnerColorChange() {
     setWinnerColorChange(winnerColorChange() + 1);
@@ -31,14 +27,6 @@ function swapInputStyle() {
     } else {
         state.setInputStyle('number');
     }
-}
-
-async function saveState() {
-    if (!isCorrectDay()) {
-        await state.loadGameFromServer();
-    }
-
-    state.saveState();
 }
 
 function curGameState(): state.GameState {
@@ -622,10 +610,6 @@ const ShareButton: Component = () => {
 };
 
 const SudokuIcons: Component = () => {
-    if (state.winner()) {
-        return <ShareButton />;
-    }
-
     function fontSize(): string {
         if (isSmall()) {
             return '2vh';
@@ -716,7 +700,7 @@ export const Sudoku: Component = () => {
         }, 1000);
 
         createEffect(() => {
-            saveState();
+            state.saveState();
         });
 
         createEffect(() => {
@@ -728,6 +712,10 @@ export const Sudoku: Component = () => {
 
         createEffect(() => {
             if (!state.history()) {
+                return;
+            }
+
+            if (state.loading()) {
                 return;
             }
 
@@ -744,6 +732,7 @@ export const Sudoku: Component = () => {
                 }
 
                 if (!state.winner()) {
+                    console.log('YOU WIN!!');
                     state.setWinner(true);
                     state.saveState(true);
                 }
@@ -843,8 +832,8 @@ export const Sudoku: Component = () => {
                 </div>
                 <div class='w-full max-h-[32dvh] md:max-h-full overflow-hidden flex flex-row items-center justify-center xl:w-[30%]'>
                     <div class='w-full h-full lg:h-[80%] lg:flex lg:flex-col lg:items-center lg:justify-center'>
-                        <SudokuIcons />
-                        <Show when={!state.winner()}>
+                        <Show when={!state.winner()} fallback={<ShareButton />}>
+                            <SudokuIcons />
                             <SudokuNumberPad />
                         </Show>
                     </div>

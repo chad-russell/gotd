@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js';
-import { baseUrl, daysEqual, getDay, throttledServerCall } from '../util';
-import { setToken, token } from '../auth/auth';
+import { baseUrl, daysEqual, getDay } from '../util';
+import { token } from '../auth/auth';
 
 export const [id, setId] = createSignal<string | null>(null);
 export const [loading, setLoading] = createSignal(false);
@@ -52,7 +52,7 @@ export async function loadGameFromServer() {
         const parsed = JSON.parse(resJson.state);
         setGuess(parsed.guess);
         setGuessHistory(parsed.guessHistory);
-        setWinner(parsed.winner);
+        setWinner(resJson.winner);
     }
 
     setLoading(false);
@@ -64,6 +64,10 @@ export async function saveState() {
     }
 
     if (id() === null) {
+        return;
+    }
+
+    if (loading()) {
         return;
     }
 
@@ -79,25 +83,15 @@ export async function saveState() {
             'guess': guess(),
             'guessHistory': guessHistory(),
             'puzzleDay': puzzleDay(),
-            'winner': winner(),
         }),
+        winner: winner(),
     });
 
-    if (winner()) {
-        console.log('saving to server!');
-        await fetch(`${baseUrl()}/squareword/state`, {
-            method: 'POST',
-            headers: headers,
-            body: body,
-        });
-    }
-    else {
-        throttledServerCall(`${baseUrl()}/squareword/state`, {
-            method: 'POST',
-            headers: headers,
-            body: body,
-        });
-    }
+    await fetch(`${baseUrl()}/squareword/state`, {
+        method: 'POST',
+        headers: headers,
+        body: body,
+    });
 }
 
 export function formatScore(): string {
