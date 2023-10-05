@@ -42,6 +42,7 @@ struct SudokuGame {
     solution: String,
     day: NaiveDate,
     state: Option<String>,
+    timestamp: Option<i64>,
     winner: Option<bool>,
 }
 
@@ -50,7 +51,7 @@ async fn get_sudoku_state(
     State(pool): State<PgPool>,
 ) -> Result<Json<SudokuGame>, (StatusCode, String)> {
     let found_game: Option<SudokuGame> =
-        sqlx::query_as("select p.id, p.puzzle, p.solution, p.day, s.state, s.winner from sudoku_puzzles p left join sudoku_scores s on s.puzzle_id=p.id and s.user_id = $1 where day = $2")
+        sqlx::query_as("select p.id, p.puzzle, p.solution, p.day, s.state, s.timestamp, s.winner from sudoku_puzzles p left join sudoku_scores s on s.puzzle_id=p.id and s.user_id = $1 where day = $2")
             .bind(&user.id)
             .bind(&midnight_today())
             .fetch_optional(&pool)
@@ -65,12 +66,12 @@ async fn get_sudoku_state(
     match found_game {
         Some(found_game) => Ok(Json(found_game)),
         None => {
-            let generated = sudokugen::generate(sudokugen::Difficulty::Medium);
-            // let generated = sudokugen::Sudoku {
-            //     puzzle: "4289751633761289459513642788197536242678415395342968-7-425873967836-945269543278-",
-            //     solution: "428975163376128945951364278819753624267841539534296817142587396783619452695432781",
-            //     difficulty: sudokugen::Difficulty::Medium,
-            // };
+            // let generated = sudokugen::generate(sudokugen::Difficulty::Medium);
+            let generated = sudokugen::Sudoku {
+                puzzle: "4289751633761289459513642788197536242678415395342968-7-425873967836-945269543278-",
+                solution: "428975163376128945951364278819753624267841539534296817142587396783619452695432781",
+                difficulty: sudokugen::Difficulty::Medium,
+            };
 
             let new_id = Uuid::new_v4();
 
@@ -96,6 +97,7 @@ async fn get_sudoku_state(
                 solution: generated.solution.to_string(),
                 day: midnight_today(),
                 state: None,
+                timestamp: None,
                 winner: Some(false),
             }))
         }
@@ -106,6 +108,7 @@ async fn get_sudoku_state(
 struct SaveSudokuStateRequest {
     puzzle_id: Uuid,
     state: Option<String>,
+    timestamp: i64,
     winner: bool,
 }
 
@@ -116,8 +119,8 @@ async fn save_sudoku_state(
 ) -> Result<(), (StatusCode, String)> {
     sqlx::query(
         "
-            insert into sudoku_scores (id, user_id, puzzle_id, state, winner) values ($1, $2, $3, $4, $5) 
-            on conflict on constraint sudoku_scores_user_id_puzzle_id_key do update set state = $4, winner=$5
+            insert into sudoku_scores (id, user_id, puzzle_id, state, timestamp, winner) values ($1, $2, $3, $4, $5, $6) 
+            on conflict on constraint sudoku_scores_user_id_puzzle_id_key do update set state = $4, timestamp = $5, winner = $6
             where not exists (select 1 from sudoku_scores where user_id = $2 and puzzle_id = $3 and winner = true)
         ",
     )
@@ -125,6 +128,7 @@ async fn save_sudoku_state(
     .bind(&user.id)
     .bind(&request.puzzle_id)
     .bind(&request.state)
+    .bind(&request.timestamp)
     .bind(&request.winner)
     .execute(&pool)
     .await
@@ -144,6 +148,7 @@ struct SquarewordGame {
     solution: String,
     day: NaiveDate,
     state: Option<String>,
+    timestamp: Option<i64>,
     winner: Option<bool>,
 }
 
@@ -152,7 +157,7 @@ async fn get_squareword_state(
     State(pool): State<PgPool>,
 ) -> Result<Json<SquarewordGame>, (StatusCode, String)> {
     let found_game: Option<SquarewordGame> =
-        sqlx::query_as("select p.id, p.solution, p.day, s.state, s.winner from squareword_puzzles p left join squareword_scores s on s.puzzle_id=p.id and s.user_id = $1 where p.day = $2")
+        sqlx::query_as("select p.id, p.solution, p.day, s.state, s.timestamp, s.winner from squareword_puzzles p left join squareword_scores s on s.puzzle_id=p.id and s.user_id = $1 where p.day = $2")
             .bind(&user.id)
             .bind(&midnight_today())
             .fetch_optional(&pool)
@@ -189,6 +194,7 @@ async fn get_squareword_state(
                 solution: generated.to_string(),
                 day: midnight_today(),
                 state: None,
+                timestamp: None,
                 winner: Some(false),
             }))
         }
@@ -199,6 +205,7 @@ async fn get_squareword_state(
 struct SaveSquarewordScoreRequest {
     puzzle_id: Uuid,
     state: Option<String>,
+    timestamp: i64,
     winner: bool,
 }
 
@@ -209,8 +216,8 @@ async fn save_squareword_state(
 ) -> Result<(), (StatusCode, String)> {
     sqlx::query(
         "
-            insert into squareword_scores (id, user_id, puzzle_id, state, winner) values ($1, $2, $3, $4, $5) 
-            on conflict on constraint squareword_scores_user_id_puzzle_id_key do update set state = $4, winner=$5
+            insert into squareword_scores (id, user_id, puzzle_id, state, timestamp, winner) values ($1, $2, $3, $4, $5, $6) 
+            on conflict on constraint squareword_scores_user_id_puzzle_id_key do update set state = $4, timestamp=$5, winner=$6
             where not exists (select 1 from squareword_scores where user_id = $2 and puzzle_id = $3 and winner = true)
         ",
     )
@@ -218,6 +225,7 @@ async fn save_squareword_state(
     .bind(&user.id)
     .bind(&request.puzzle_id)
     .bind(&request.state)
+    .bind(&request.timestamp)
     .bind(&request.winner)
     .execute(&pool)
     .await
@@ -479,7 +487,6 @@ async fn main() {
         .layer(CorsLayer::permissive())
         .with_state(pool);
 
-    // let addr = SocketAddr::from(([127, 0, 0, 1], 3001));
     let addr = SocketAddr::from(([0, 0, 0, 0], 3001));
 
     tracing::debug!("listening on {}", addr);

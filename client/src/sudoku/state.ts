@@ -52,23 +52,37 @@ export async function saveState() {
         return;
     }
 
-    const historyLast5 = (history() ?? []).slice(-1);
+    const historyLast1 = (history() ?? []).slice(-1);
 
     const headers = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token()}`,
     };
 
+    const timestamp = Date.now();
+
+    localStorage.setItem('sudoku', JSON.stringify({
+        id: id(),
+        seconds: seconds(),
+        paused: paused(),
+        history: history(),
+        winner: winner(),
+        inputStyle: inputStyle(),
+        puzzleDay: puzzleDay(),
+        timestamp: timestamp,
+    }));
+
     const body = JSON.stringify({
         puzzle_id: id(),
         state: JSON.stringify({
-            'id': id(),
-            'paused': paused(),
-            'seconds': seconds(),
-            'inputStyle': inputStyle(),
-            'history': historyLast5,
-            'puzzleDay': puzzleDay(),
+            id: id(),
+            paused: paused(),
+            seconds: seconds(),
+            inputStyle: inputStyle(),
+            history: historyLast1,
+            puzzleDay: puzzleDay(),
         }),
+        timestamp: timestamp,
         winner: winner(),
     });
 
@@ -85,28 +99,72 @@ export async function loadGameFromServer() {
     }
     setLoading(true);
 
-    let res = await fetch(`${baseUrl()}/sudoku/state`, {
+    let local = localStorage.getItem('sudoku');
+    let localTimestamp = null;
+    if (local !== null) {
+        let { id, solution, seconds, paused, history, inputStyle, puzzleDay, winner, timestamp } = JSON.parse(local);
+
+        puzzleDay = new Date(puzzleDay);
+
+        if (timestamp && puzzleDay && daysEqual(puzzleDay, getDay())) {
+            localTimestamp = timestamp;
+
+            setId(id);
+            setSeconds(seconds);
+            setPaused(paused);
+            setHistory(history);
+            setInputStyle(inputStyle);
+            setPuzzleDay(puzzleDay);
+            setWinner(winner);
+            setSolution(solution);
+
+            if (timestamp >= Date.now() - 1000 * 60) {
+                setLoading(false);
+                return;
+            }
+        }
+    }
+
+    const res = await fetch(`${baseUrl()}/sudoku/state`, {
         headers: {
             'Authorization': `Bearer ${token()}`
         }
     });
-    let p = await res.json();
+    const resJson = await res.json();
 
-    let [y, m, d] = p.day.split('-');
+    if (resJson.timestamp) {
+        let serverTimestamp = resJson.timestamp;
+        if (localTimestamp && serverTimestamp <= localTimestamp) {
+            setLoading(false);
+            return;
+        }
+    }
+
+    let [y, m, d] = resJson.day.split('-');
     let date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
     setPuzzleDay(date);
 
-    if (p.state !== null) {
-        let { id, seconds, paused, history } = JSON.parse(p.state);
+    setSolution(resJson.solution);
+    setId(resJson.id);
 
-        setId(id);
+    if (resJson.state !== null) {
+        localStorage.setItem('sudoku', JSON.stringify({
+            ...JSON.parse(resJson.state),
+            solution: resJson.solution,
+            winner: resJson.winner,
+            puzzleDay: date,
+            timestamp: resJson.timestamp,
+        }));
+
+        let { seconds, paused, inputStyle, history } = JSON.parse(resJson.state);
+
         setSeconds(seconds);
         setPaused(paused);
         setHistory(history);
-        setSolution(p.solution);
-        setWinner(p.winner);
+        setInputStyle(inputStyle);
+        setWinner(resJson.winner);
     } else {
-        const cells: CellState[] = p.puzzle.split('').map((c: string) => {
+        const cells: CellState[] = resJson.puzzle.split('').map((c: string) => {
             if (c === '-') {
                 return {
                     value: null,
@@ -129,16 +187,23 @@ export async function loadGameFromServer() {
             cells,
         }]);
 
-        setSolution(p.solution);
-
-        setId(p.id);
-
         setSeconds(0);
+
+        localStorage.setItem('sudoku', JSON.stringify({
+            id: resJson.id,
+            seconds: 0,
+            paused: false,
+            history: history(),
+            inputStyle: inputStyle(),
+            winner: false,
+            puzzleDay: date,
+            timestamp: Date.now(),
+        }));
     }
 
     setLoading(false);
 
-    saveState();
+    // saveState();
 }
 
 export function formatScore(): string {

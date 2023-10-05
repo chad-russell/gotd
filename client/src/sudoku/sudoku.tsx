@@ -238,7 +238,7 @@ const Note: Component<{ n: number, notenum: number }> = (props) => {
     const notes = () => curGameState()?.cells[props.n]?.notes;
 
     return (
-        <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin'>
+        <div class='w-full h-full flex flex-col items-center justify-center text-[1.3vh] md:text-[1.9vh] text-gray-700 font-thin select-none'>
             {notes()?.includes(props.notenum) ? props.notenum : null}
         </div>
     );
@@ -662,9 +662,9 @@ const Timer: Component = () => {
     }
 
     return (
-        <div class='flex flex-row h-[8dvh] md:h-[10dvh] items-center justify-center'>
+        <div class='flex flex-row h-[8dvh] xl:h-[10dvh] items-center justify-center'>
             <div
-                class={`flex flex-row items-center py-1 px-4 md:my-1 text-lg md:text-xl lg:text-2xl text-center text-blue-600 bg-white border border-stone-800 rounded-md shadow-lg`}
+                class={`flex flex-row items-center py-1 px-4 text-lg md:text-xl lg:text-2xl text-center text-blue-600 bg-white border border-stone-800 rounded-md shadow-lg`}
                 onClick={() => {
                     if (state.winner()) {
                         return;
@@ -732,9 +732,7 @@ export const Sudoku: Component = () => {
                 }
 
                 if (!state.winner()) {
-                    console.log('YOU WIN!!');
                     state.setWinner(true);
-                    state.saveState(true);
                 }
             }
         });

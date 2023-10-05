@@ -26,12 +26,44 @@ export async function loadGameFromServer() {
     }
     setLoading(true);
 
+    let local = localStorage.getItem('squareword');
+    let localTimestamp: number | null = null;
+    if (local !== null) {
+        let { id, puzzleDay, solution, guess, guessHistory, winner, timestamp } = JSON.parse(local);
+
+        puzzleDay = new Date(puzzleDay);
+
+        if (timestamp && puzzleDay && daysEqual(puzzleDay, getDay())) {
+            localTimestamp = timestamp;
+
+            setId(id);
+            setPuzzleDay(puzzleDay);
+            setSolution(solution);
+            setGuess(guess);
+            setGuessHistory(guessHistory);
+            setWinner(winner);
+
+            if (timestamp >= Date.now() - 1000 * 10) {
+                setLoading(false);
+                return;
+            }
+        }
+    }
+
     const res = await fetch(`${baseUrl()}/squareword/state`, {
         headers: {
             'Authorization': `Bearer ${token()}`
         }
     });
     const resJson = await res.json();
+
+    if (resJson.timestamp && localTimestamp) {
+        let serverTimestamp = resJson.timestamp;
+        if (serverTimestamp <= localTimestamp) {
+            setLoading(false);
+            return;
+        }
+    }
 
     const sol = resJson.solution;
     setSolution([
@@ -53,6 +85,23 @@ export async function loadGameFromServer() {
         setGuess(parsed.guess);
         setGuessHistory(parsed.guessHistory);
         setWinner(resJson.winner);
+
+        localStorage.setItem('squareword', JSON.stringify({
+            ...JSON.parse(resJson.state),
+            winner: resJson.winner,
+            puzzleDay: date,
+            timestamp: resJson.timestamp,
+        }));
+    } else {
+        localStorage.setItem('squareword', JSON.stringify({
+            id: id(),
+            puzzleDay: date,
+            solution: solution(),
+            guess: guess(),
+            guessHistory: guessHistory(),
+            winner: resJson.winner,
+            timestamp: resJson.timestamp,
+        }));
     }
 
     setLoading(false);
@@ -76,6 +125,8 @@ export async function saveState() {
         'Authorization': `Bearer ${token()}`,
     };
 
+    const timestamp = Date.now();
+
     const body = JSON.stringify({
         puzzle_id: id(),
         state: JSON.stringify({
@@ -85,7 +136,18 @@ export async function saveState() {
             'puzzleDay': puzzleDay(),
         }),
         winner: winner(),
+        timestamp: timestamp,
     });
+
+    localStorage.setItem('squareword', JSON.stringify({
+        id: id(),
+        puzzleDay: puzzleDay(),
+        solution: solution(),
+        guess: guess(),
+        guessHistory: guessHistory(),
+        winner: winner(),
+        timestamp: timestamp,
+    }));
 
     await fetch(`${baseUrl()}/squareword/state`, {
         method: 'POST',
