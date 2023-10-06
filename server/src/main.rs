@@ -66,12 +66,12 @@ async fn get_sudoku_state(
     match found_game {
         Some(found_game) => Ok(Json(found_game)),
         None => {
-            // let generated = sudokugen::generate(sudokugen::Difficulty::Medium);
-            let generated = sudokugen::Sudoku {
-                puzzle: "4289751633761289459513642788197536242678415395342968-7-425873967836-945269543278-",
-                solution: "428975163376128945951364278819753624267841539534296817142587396783619452695432781",
-                difficulty: sudokugen::Difficulty::Medium,
-            };
+            let generated = sudokugen::generate(sudokugen::Difficulty::Medium);
+            // let generated = sudokugen::Sudoku {
+            //     puzzle: "4289751633761289459513642788197536242678415395342968-7-425873967836-945269543278-",
+            //     solution: "428975163376128945951364278819753624267841539534296817142587396783619452695432781",
+            //     difficulty: sudokugen::Difficulty::Medium,
+            // };
 
             let new_id = Uuid::new_v4();
 
