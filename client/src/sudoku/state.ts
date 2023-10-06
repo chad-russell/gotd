@@ -52,7 +52,10 @@ export async function saveState() {
         return;
     }
 
-    const historyLast1 = (history() ?? []).slice(-1);
+    let historyLast1 = history()?.slice(-1) ?? null;
+    if (historyLast1?.length == 0) {
+        historyLast1 = null;
+    }
 
     const headers = {
         'Content-Type': 'application/json',
@@ -63,6 +66,7 @@ export async function saveState() {
 
     localStorage.setItem('sudoku', JSON.stringify({
         id: id(),
+        solution: solution(),
         seconds: seconds(),
         paused: paused(),
         history: history(),
@@ -191,6 +195,7 @@ export async function loadGameFromServer() {
 
         localStorage.setItem('sudoku', JSON.stringify({
             id: resJson.id,
+            solution: resJson.solution,
             seconds: 0,
             paused: false,
             history: history(),

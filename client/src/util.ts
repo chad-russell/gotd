@@ -1,7 +1,7 @@
 export function baseUrl(): string {
-    // return 'https://mpro.crussell.io:3001';
+    return 'https://mpro.crussell.io:3001';
     // return 'http://localhost:3001';
-    return 'https://gotd.crussell.io/api';
+    // return 'https://gotd.crussell.io/api';
 }
 
 export function dateAtMidnight(d: Date): Date {

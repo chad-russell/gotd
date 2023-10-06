@@ -67,6 +67,8 @@ const LoginButton: Component = () => {
 
     onMount(() => {
         window.onload = () => {
+            localStorage.clear();
+
             google.accounts.id.initialize({
                 client_id: "1012807370880-93eor5h650abjrreks9ut5f5dp5tv67q.apps.googleusercontent.com",
                 callback: handleCredentialResponse

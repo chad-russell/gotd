@@ -48,13 +48,13 @@ struct SudokuGame {
 
 async fn get_sudoku_state(
     user: User,
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
 ) -> Result<Json<SudokuGame>, (StatusCode, String)> {
     let found_game: Option<SudokuGame> =
         sqlx::query_as("select p.id, p.puzzle, p.solution, p.day, s.state, s.timestamp, s.winner from sudoku_puzzles p left join sudoku_scores s on s.puzzle_id=p.id and s.user_id = $1 where day = $2")
             .bind(&user.id)
             .bind(&midnight_today())
-            .fetch_optional(&pool)
+            .fetch_optional(&state.pool)
             .await
             .map_err(|e| {
                 (
@@ -66,12 +66,15 @@ async fn get_sudoku_state(
     match found_game {
         Some(found_game) => Ok(Json(found_game)),
         None => {
-            let generated = sudokugen::generate(sudokugen::Difficulty::Medium);
-            // let generated = sudokugen::Sudoku {
-            //     puzzle: "4289751633761289459513642788197536242678415395342968-7-425873967836-945269543278-",
-            //     solution: "428975163376128945951364278819753624267841539534296817142587396783619452695432781",
-            //     difficulty: sudokugen::Difficulty::Medium,
-            // };
+            let generated = if state.args.test_sudoku {
+                sudokugen::Sudoku {
+                puzzle: "4289751633761289459513642788197536242678415395342968-7-425873967836-945269543278-",
+                solution: "428975163376128945951364278819753624267841539534296817142587396783619452695432781",
+                difficulty: sudokugen::Difficulty::Medium,
+            }
+            } else {
+                sudokugen::generate(sudokugen::Difficulty::Medium)
+            };
 
             let new_id = Uuid::new_v4();
 
@@ -82,7 +85,7 @@ async fn get_sudoku_state(
             .bind(&generated.puzzle)
             .bind(&generated.solution)
             .bind(&midnight_today())
-            .execute(&pool)
+            .execute(&state.pool)
             .await
             .map_err(|e| {
                 (
@@ -114,7 +117,7 @@ struct SaveSudokuStateRequest {
 
 async fn save_sudoku_state(
     user: User,
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Json(request): Json<SaveSudokuStateRequest>,
 ) -> Result<(), (StatusCode, String)> {
     sqlx::query(
@@ -130,7 +133,7 @@ async fn save_sudoku_state(
     .bind(&request.state)
     .bind(&request.timestamp)
     .bind(&request.winner)
-    .execute(&pool)
+    .execute(&state.pool)
     .await
     .map_err(|e| {
         (
@@ -154,13 +157,13 @@ struct SquarewordGame {
 
 async fn get_squareword_state(
     user: User,
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
 ) -> Result<Json<SquarewordGame>, (StatusCode, String)> {
     let found_game: Option<SquarewordGame> =
         sqlx::query_as("select p.id, p.solution, p.day, s.state, s.timestamp, s.winner from squareword_puzzles p left join squareword_scores s on s.puzzle_id=p.id and s.user_id = $1 where p.day = $2")
             .bind(&user.id)
             .bind(&midnight_today())
-            .fetch_optional(&pool)
+            .fetch_optional(&state.pool)
             .await
             .map_err(|e| {
                 (
@@ -180,7 +183,7 @@ async fn get_squareword_state(
                 .bind(&new_id)
                 .bind(generated)
                 .bind(&midnight_today())
-                .execute(&pool)
+                .execute(&state.pool)
                 .await
                 .map_err(|e| {
                     (
@@ -211,7 +214,7 @@ struct SaveSquarewordScoreRequest {
 
 async fn save_squareword_state(
     user: User,
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Json(request): Json<SaveSquarewordScoreRequest>,
 ) -> Result<(), (StatusCode, String)> {
     sqlx::query(
@@ -227,7 +230,7 @@ async fn save_squareword_state(
     .bind(&request.state)
     .bind(&request.timestamp)
     .bind(&request.winner)
-    .execute(&pool)
+    .execute(&state.pool)
     .await
     .map_err(|e| {
         (
@@ -283,7 +286,7 @@ struct LoginRequest {
 }
 
 async fn login(
-    State(pool): State<PgPool>,
+    State(state): State<AppState>,
     Json(req): Json<LoginRequest>,
 ) -> Result<String, (StatusCode, String)> {
     let header = jsonwebtoken::decode_header(&req.token).unwrap();
@@ -317,7 +320,7 @@ async fn login(
     // Look for an existing user. If not, create one
     let user: Option<User> = sqlx::query_as("select * from users where email = $1")
         .bind(&token.claims.email)
-        .fetch_optional(&pool)
+        .fetch_optional(&state.pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -328,7 +331,7 @@ async fn login(
             sqlx::query("update users set last_login = $1 where id = $2")
                 .bind(&Utc::now())
                 .bind(&user.id)
-                .execute(&pool)
+                .execute(&state.pool)
                 .await
                 .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -351,7 +354,7 @@ async fn login(
                 .bind(&(user.picture.clone().unwrap_or_else(|| "".to_string())))
                 .bind(&user.created_at)
                 .bind(&user.last_login)
-                .execute(&pool)
+                .execute(&state.pool)
                 .await
                 .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -442,11 +445,22 @@ async fn leaderboard() -> Result<Json<LeaderboardResponse>, (StatusCode, String)
     }))
 }
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 struct Args {
-    /// DB Hostname
-    #[arg(short, long, default_value = "localhost")]
+    #[arg(long, default_value = "localhost")]
     db_host: String,
+
+    #[arg(long, default_value = "gotd")]
+    db_name: String,
+
+    #[arg(long, default_value = "false")]
+    test_sudoku: bool,
+}
+
+#[derive(Clone)]
+struct AppState {
+    pool: PgPool,
+    args: Args,
 }
 
 #[tokio::main]
@@ -470,7 +484,7 @@ async fn main() {
                 .password("pgpass")
                 .host(&args.db_host)
                 .port(5432)
-                .database("gotd"),
+                .database(&args.db_name),
         )
         .await
         .expect("can't connect to database");
@@ -485,7 +499,7 @@ async fn main() {
         .route("/leaderboard", get(leaderboard))
         .route("/check_auth", get(check_auth))
         .layer(CorsLayer::permissive())
-        .with_state(pool);
+        .with_state(AppState { pool, args });
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3001));
 
